@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Admin Settings</h2>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Website Settings</h5>
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="allow_registration" 
+                                   name="allow_registration" {% if settings.allow_registration %}checked{% endif %}>
+                            <label class="form-check-label" for="allow_registration">
+                                Allow User Registration
+                            </label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="restrict_email_domains" 
+                                   name="restrict_email_domains" {% if settings.restrict_email_domains %}checked{% endif %}>
+                            <label class="form-check-label" for="restrict_email_domains">
+                                Restrict Registration to Specific Email Domains
+                            </label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="require_mfa_for_all_users" 
+                                   name="require_mfa_for_all_users" {% if settings.require_mfa_for_all_users %}checked{% endif %}>
+                            <label class="form-check-label" for="require_mfa_for_all_users">
+                                Require MFA for All Users (GlobalAdmin accounts exempt)
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">Password Strength Requirements</h5>
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <label for="password_min_length" class="form-label">Minimum Password Length</label>
+                            <input type="number" class="form-control" id="password_min_length" 
+                                   name="password_min_length" min="6" max="128" 
+                                   value="{{ settings.password_min_length or 10 }}" required>
+                            <div class="form-text">Minimum 6 characters required</div>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="password_require_numbers_mixed_case" 
+                                   name="password_require_numbers_mixed_case" 
+                                   {% if settings.password_require_numbers_mixed_case %}checked{% endif %}>
+                            <label class="form-check-label" for="password_require_numbers_mixed_case">
+                                Require Numbers and Mixed Case Letters
+                            </label>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="password_require_special_chars" 
+                                   name="password_require_special_chars" 
+                                   {% if settings.password_require_special_chars %}checked{% endif %}>
+                            <label class="form-check-label" for="password_require_special_chars">
+                                Require Special Characters
+                            </label>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="password_safe_special_chars" class="form-label">Safe Special Characters</label>
+                            <input type="text" class="form-control" id="password_safe_special_chars" 
+                                   name="password_safe_special_chars" 
+                                   value="{{ settings.password_safe_special_chars or '!@#$%^&*()_+-=[]{}|;:,.<>?' }}">
+                            <div class="form-text">Characters allowed for special character requirement</div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Save Password Settings</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">Database Logging Configuration</h5>
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <label for="log_level" class="form-label">Database Logging Level</label>
+                            <select class="form-select" id="log_level" name="log_level">
+                                {% for level_value, level_description in available_log_levels %}
+                                <option value="{{ level_value }}" 
+                                        {% if settings.log_level == level_value %}selected{% endif %}>
+                                    {{ level_description }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">
+                                Controls which log messages are saved to the database. Lower levels include all higher levels.
+                                <br><strong>Note:</strong> DEBUG and INFO levels may generate many log entries and increase database size.
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Save Logging Settings</button>
+                    </form>
+                    
+                    <div class="mt-3">
+                        <h6>Current Log Level: <span class="badge bg-primary">{{ settings.log_level or 'WARNING' }}</span></h6>
+                        <div class="small text-muted">
+                            <p><strong>Level Descriptions:</strong></p>
+                            <ul class="mb-0">
+                                <li><strong>DEBUG:</strong> All messages including detailed debugging information</li>
+                                <li><strong>INFO:</strong> General information (logins, registrations, etc.)</li>
+                                <li><strong>WARNING:</strong> Warnings and potential issues (failed logins, etc.)</li>
+                                <li><strong>ERROR:</strong> Error messages and exceptions</li>
+                                <li><strong>CRITICAL:</strong> Only critical system errors</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">Allowed Email Domains</h5>
+                    <form method="POST" action="{{ url_for('auth.add_allowed_domain') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" name="domain" 
+                                   placeholder="example.com" required>
+                            <button class="btn btn-outline-primary" type="submit">Add Domain</button>
+                        </div>
+                    </form>
+                    <div class="mt-3">
+                        {% if allowed_domains %}
+                        <ul class="list-group">
+                            {% for domain in allowed_domains %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ domain.domain }}
+                                <form method="POST" action="{{ url_for('auth.delete_allowed_domain', domain_id=domain.id) }}" 
+                                      style="display: inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-danger btn-sm"
+                                            onclick="return confirm('Are you sure you want to remove this domain?')">
+                                        Remove
+                                    </button>
+                                </form>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="text-muted">No domains added yet. When domains are restricted, only users with these email domains can register.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

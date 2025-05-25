@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block head %}
+<!-- DataTables CSS -->
+<link href="{{ url_for('static', filename='css/dataTables.bootstrap5.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/buttons.bootstrap5.min.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ company.name }} - User Management</h2>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title">Company Users</h5>
+                <div>
+                    <a href="{{ url_for('auth.download_agent', company_id=company.id) }}" class="btn btn-success me-2">
+                        <i class="fas fa-download"></i> Download Agent
+                    </a>
+                    <a href="{{ url_for('auth.create_company_user', company_id=company.id) }}" class="btn btn-success me-2">Create New User</a>
+                    <a href="{{ url_for('auth.add_company_user', company_id=company.id) }}" class="btn btn-primary">Add Existing User</a>
+                </div>
+            </div>
+            
+            <div class="table-responsive mt-3">
+                <table class="table table-striped" id="companyUsersTable">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for uc in user_companies %}
+                        <tr>
+                            <td>{{ uc.user.username }}</td>
+                            <td>{{ uc.user.email }}</td>
+                            <td>
+                                {% if current_user.is_global_admin() or current_user.is_company_admin(company.id) %}
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="roleDropdown{{ uc.id }}" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false">
+                                        {{ uc.role }}
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="roleDropdown{{ uc.id }}">
+                                        <li>
+                                            <form action="{{ url_for('auth.change_company_user_role', company_id=company.id, user_id=uc.user_id) }}" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="role" value="User">
+                                                <button type="submit" class="dropdown-item {% if uc.role == 'User' %}active{% endif %}">User</button>
+                                            </form>
+                                        </li>
+                                        <li>
+                                            <form action="{{ url_for('auth.change_company_user_role', company_id=company.id, user_id=uc.user_id) }}" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="role" value="CompanyAdmin">
+                                                <button type="submit" class="dropdown-item {% if uc.role == 'CompanyAdmin' %}active{% endif %}">Company Admin</button>
+                                            </form>
+                                        </li>
+                                    </ul>
+                                </div>
+                                {% else %}
+                                {{ uc.role }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form action="{{ url_for('auth.remove_company_user', company_id=company.id, user_id=uc.user_id) }}" method="POST" style="display:inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-danger" 
+                                            {% if uc.role == 'CompanyAdmin' and not current_user.is_global_admin() %}disabled{% endif %}
+                                            onclick="return confirm('Are you sure you want to remove this user from the company?')">
+                                        Remove
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="mt-3">
+                <a href="{{ url_for('auth.manage_companies') }}" class="btn btn-secondary">Back to Companies</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- DataTables JS -->
+<script src="{{ url_for('static', filename='js/jquery.dataTables.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dataTables.bootstrap5.min.js') }}"></script>
+
+<script>
+$(document).ready(function() {
+    // Initialize DataTable
+    $('#companyUsersTable').DataTable({
+        "pageLength": 10,
+        "order": [[0, "asc"]]
+    });
+    
+    // Fix dropdown position for items near the bottom of the screen
+    $('.dropdown-toggle').on('click', function() {
+        var $button = $(this);
+        var $dropdownMenu = $button.next('.dropdown-menu');
+        
+        // Get positions
+        var buttonOffset = $button.offset();
+        var buttonHeight = $button.outerHeight();
+        var dropdownHeight = $dropdownMenu.outerHeight();
+        
+        // Calculate if dropdown would go off screen
+        var bottomSpace = $(window).height() - (buttonOffset.top - $(window).scrollTop() + buttonHeight);
+        if (bottomSpace < dropdownHeight) {
+            // Not enough space below, make it open upwards
+            $(this).parent().addClass('dropup');
+        } else {
+            $(this).parent().removeClass('dropup');
+        }
+    });
+});
+</script>
+{% endblock %}

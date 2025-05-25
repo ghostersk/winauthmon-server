@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+{% block head %}
+    <!-- DataTables CSS -->
+    <link href="{{ url_for('static', filename='css/dataTables.bootstrap5.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/buttons.bootstrap5.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/buttons.dataTables.min.css') }}" rel="stylesheet">
+    
+    <style>
+        .log-level-CRITICAL { color: #dc3545; font-weight: bold; }
+        .log-level-ERROR { color: #dc3545; }
+        .log-level-WARNING { color: #ffc107; }
+        .log-level-INFO { color: #0dcaf0; }
+        .log-level-DEBUG { color: #6c757d; }
+        
+        .log-message {
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .exception-toggle {
+            cursor: pointer;
+            color: #0d6efd;
+            text-decoration: underline;
+        }
+        
+        .exception-details {
+            background-color: #343a40;
+            border: 1px solid #495057;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-top: 0.5rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        
+        .filter-form {
+            background-color: #343a40;
+            border-radius: 0.375rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .stats-cards {
+            margin-bottom: 1.5rem;
+        }
+        
+        .stat-card {
+            background-color: #343a40;
+            border: 1px solid #495057;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer; 
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            color: #adb5bd;
+            font-size: 0.875rem;
+        }
+    </style>
+{% endblock %}
+
+{% block title %}Error Logs{% endblock %}
+{% block content %}
+    <div class="container-fluid mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Application Error Logs</h2>
+            <div>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#clearLogsModal">
+                    Clear Old Logs
+                </button>
+                <button id="refresh-logs" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-refresh"></i> Refresh
+                </button>
+            </div>
+        </div>
+        
+        <!-- Statistics Cards -->
+        <div class="row stats-cards">
+            <div class="col-md">
+                <div class="stat-card">
+                    <div class="stat-number text-info" id="debug-count">{{ error_logs | selectattr('level', 'equalto', 'DEBUG') | list | length }}</div>
+                    <div class="stat-label">Debug</div>
+                </div>
+            </div>
+            <div class="col-md">
+                <div class="stat-card">
+                    <div class="stat-number text-info" id="info-count">{{ error_logs | selectattr('level', 'equalto', 'INFO') | list | length }}</div>
+                    <div class="stat-label">Info</div>
+                </div>
+            </div>
+            <div class="col-md">
+                <div class="stat-card">
+                    <div class="stat-number text-danger" id="critical-count">{{ error_logs | selectattr('level', 'equalto', 'CRITICAL') | list | length }}</div>
+                    <div class="stat-label">Critical</div>
+                </div>
+            </div>
+            <div class="col-md">
+                <div class="stat-card">
+                    <div class="stat-number text-danger" id="error-count">{{ error_logs | selectattr('level', 'equalto', 'ERROR') | list | length }}</div>
+                    <div class="stat-label">Errors</div>
+                </div>
+            </div>
+            <div class="col-md">
+                <div class="stat-card">
+                    <div class="stat-number text-warning" id="warning-count">{{ error_logs | selectattr('level', 'equalto', 'WARNING') | list | length }}</div>
+                    <div class="stat-label">Warnings</div>
+                </div>
+            </div>
+            <div class="col-md">
+                <div class="stat-card">
+                    <div class="stat-number text-info" id="total-count">{{ error_logs | length }}</div>
+                    <div class="stat-label">Total Logs</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Filter Form -->
+        <div class="filter-form">
+            <form method="GET" action="{{ url_for('auth.view_error_logs') }}">
+                <div class="row align-items-end">
+                    <div class="col-md-3">
+                        <label for="start_date" class="form-label">Start Date:</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="end_date" class="form-label">End Date:</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="level" class="form-label">Log Level:</label>
+                        <select class="form-select" id="level" name="level">
+                            <option value="">All Levels</option>
+                            {% for level in available_levels %}
+                            <option value="{{ level }}" {% if level == level_filter %}selected{% endif %}>{{ level }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                        <a href="{{ url_for('auth.view_error_logs') }}" class="btn btn-outline-secondary">Reset</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Error Logs Table -->
+        <div class="card">
+            <div class="card-body">
+                <table id="errorLogsTable" class="table table-striped table-bordered" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Level</th>
+                            <th>Logger</th>
+                            <th>Message</th>
+                            <th>User</th>
+                            <th>IP Address</th>
+                            <th>Request ID</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in error_logs %}
+                        <tr>
+                            <td data-order="{{ log.timestamp.strftime('%Y%m%d%H%M%S') }}">
+                                {{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
+                            </td>
+                            <td>
+                                <span class="log-level-{{ log.level }}">{{ log.level }}</span>
+                            </td>
+                            <td>{{ log.logger_name or 'N/A' }}</td>
+                            <td>
+                                <div class="log-message" title="{{ log.message }}">{{ log.message }}</div>
+                                {% if log.exception %}
+                                <small class="exception-toggle" onclick="toggleException({{ log.id }})">
+                                    View Exception
+                                </small>
+                                <div id="exception-{{ log.id }}" class="exception-details" style="display: none;">
+                                    {{ log.exception }}
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>{{ log.user_id or 'N/A' }}</td>
+                            <td>{{ log.remote_addr or 'N/A' }}</td>
+                            <td>{{ log.request_id or 'N/A' }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-info" onclick="viewLogDetail({{ log.id }})">
+                                    Details
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Clear Logs Modal -->
+    <div class="modal fade" id="clearLogsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Clear Old Error Logs</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>This will permanently delete error logs older than the specified number of days.</p>
+                    <div class="mb-3">
+                        <label for="daysToKeep" class="form-label">Keep logs for (days):</label>
+                        <input type="number" class="form-control" id="daysToKeep" value="30" min="1" max="365">
+                        <div class="form-text">Logs older than this many days will be deleted.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" onclick="clearOldLogs()">Clear Logs</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Log Detail Modal -->
+    <div class="modal fade" id="logDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Error Log Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="logDetailContent">
+                        <!-- Content loaded via JavaScript -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <!-- DataTables JS -->
+    <script src="{{ url_for('static', filename='js/jquery.dataTables.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dataTables.bootstrap5.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dataTables.buttons.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/buttons.bootstrap5.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/buttons.html5.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/jszip.min.js') }}"></script>
+    
+    <script>
+        $(document).ready(function() {
+            // Initialize DataTable
+            var table = $('#errorLogsTable').DataTable({
+                pageLength: 25,
+                lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
+                order: [[0, 'desc']], // Sort by timestamp descending
+                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                     '<"row"<"col-sm-12"tr>>' +
+                     '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+                buttons: [
+                    {
+                        extend: 'csv',
+                        text: 'Export CSV',
+                        className: 'btn btn-secondary btn-sm',
+                        filename: 'error_logs_' + new Date().toISOString().split('T')[0]
+                    }
+                ],
+                language: {
+                    search: "Search logs:",
+                    lengthMenu: "Show _MENU_ logs per page",
+                    info: "Showing _START_ to _END_ of _TOTAL_ logs",
+                    paginate: {
+                        first: "First",
+                        last: "Last",
+                        next: "Next",
+                        previous: "Previous"
+                    }
+                }
+            });
+            
+            // Stats card click events
+            $('#debug-count').closest('.stat-card').on('click', function() {
+                table.column(1).search('Debug').draw();
+            });
+            $('#info-count').closest('.stat-card').on('click', function() {
+                table.column(1).search('Info').draw();
+            });
+            $('#critical-count').closest('.stat-card').on('click', function() {
+                table.column(1).search('CRITICAL').draw();
+            });
+            $('#error-count').closest('.stat-card').on('click', function() {
+                table.column(1).search('ERROR').draw();
+            });
+            $('#warning-count').closest('.stat-card').on('click', function() {
+                table.column(1).search('WARNING').draw();
+            });
+            $('#total-count').closest('.stat-card').on('click', function() {
+                table.column(1).search('').draw();
+            });
+
+            // Refresh button
+            $('#refresh-logs').on('click', function() {
+                location.reload();
+            });
+        });
+        
+        function toggleException(logId) {
+            var element = document.getElementById('exception-' + logId);
+            if (element.style.display === 'none') {
+                element.style.display = 'block';
+            } else {
+                element.style.display = 'none';
+            }
+        }
+        
+        function viewLogDetail(logId) {
+            fetch(`{{ url_for('auth.view_error_log_detail', log_id=0) }}`.replace('0', logId))
+                .then(response => response.json())
+                .then(data => {
+                    var content = `
+                        <div class="row">
+                            <div class="col-md-6"><strong>ID:</strong> ${data.id}</div>
+                            <div class="col-md-6"><strong>Level:</strong> <span class="log-level-${data.level}">${data.level}</span></div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6"><strong>Logger:</strong> ${data.logger_name || 'N/A'}</div>
+                            <div class="col-md-6"><strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleString()}</div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6"><strong>User ID:</strong> ${data.user_id || 'N/A'}</div>
+                            <div class="col-md-6"><strong>IP Address:</strong> ${data.remote_addr || 'N/A'}</div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6"><strong>Request ID:</strong> ${data.request_id || 'N/A'}</div>
+                            <div class="col-md-6"><strong>File:</strong> ${data.pathname || 'N/A'}${data.lineno ? ':' + data.lineno : ''}</div>
+                        </div>
+                        <div class="mt-3">
+                            <strong>Message:</strong>
+                            <div class="exception-details mt-1">${data.message}</div>
+                        </div>
+                        ${data.exception ? `
+                        <div class="mt-3">
+                            <strong>Exception:</strong>
+                            <div class="exception-details mt-1">${data.exception}</div>
+                        </div>
+                        ` : ''}
+                    `;
+                    
+                    document.getElementById('logDetailContent').innerHTML = content;
+                    new bootstrap.Modal(document.getElementById('logDetailModal')).show();
+                })
+                .catch(error => {
+                    alert('Error loading log details: ' + error);
+                });
+        }
+        
+        function clearOldLogs() {
+            var daysToKeep = document.getElementById('daysToKeep').value;
+            
+            if (!confirm(`Are you sure you want to delete all error logs older than ${daysToKeep} days? This action cannot be undone.`)) {
+                return;
+            }
+            
+            fetch(`{{ url_for('auth.clear_error_logs') }}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': $('meta[name=csrf-token]').attr('content')
+                },
+                body: JSON.stringify({
+                    days_to_keep: parseInt(daysToKeep)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Error clearing logs: ' + error);
+            });
+            
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('clearLogsModal')).hide();
+        }
+    </script>
+{% endblock %}

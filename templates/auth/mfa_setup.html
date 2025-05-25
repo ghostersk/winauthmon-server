@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Two-Factor Authentication Setup</h3>
+                    {% if forced_setup %}
+                    <div class="alert alert-warning mb-0 mt-2">
+                        <strong>Required:</strong> You must set up two-factor authentication to continue using your account.
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <ol class="mb-4">
+                        <li>Install an authenticator app like Google Authenticator or Microsoft Authenticator on your phone</li>
+                        <li>Scan the QR code below or manually enter the secret key in your authenticator app</li>
+                        <li>Enter the 6-digit code from your app to verify setup</li>
+                    </ol>
+
+                    <div class="text-center mb-4">
+                        <img src="{{ qr_code }}" alt="QR Code" class="img-fluid" style="max-width: 200px;">
+                    </div>
+
+                    <div class="accordion mb-4">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" 
+                                        data-bs-toggle="collapse" data-bs-target="#manualSetup">
+                                    Can't scan the QR code?
+                                </button>
+                            </h2>
+                            <div id="manualSetup" class="accordion-collapse collapse">
+                                <div class="accordion-body">
+                                    <p><strong>Secret Key:</strong> <code>{{ secret }}</code></p>
+                                    <p class="text-muted small">Enter this secret key manually in your authenticator app if you can't scan the QR code.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="POST" action="">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="verification_code" class="form-label">Verification Code</label>
+                            <input type="text" class="form-control" id="verification_code" 
+                                   name="verification_code" required pattern="[0-9]{6}" maxlength="6">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Verify and Enable 2FA</button>
+                        {% if not forced_setup %}
+                        <a href="{{ url_for('auth.profile') }}" class="btn btn-secondary">Cancel</a>
+                        {% else %}
+                        <a href="{{ url_for('auth.logout') }}" class="btn btn-secondary">Logout</a>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

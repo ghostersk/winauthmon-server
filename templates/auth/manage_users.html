@@ -1,0 +1,839 @@
+{% extends "base.html" %}
+
+{% block head %}
+<!-- DataTables CSS -->
+<link href="{{ url_for('static', filename='css/dataTables.bootstrap5.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/buttons.bootstrap5.min.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block title %}Manage Users{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Manage Users</h2>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Create New User</h5>
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="role" class="form-label">Role</label>
+                        <select class="form-select" id="role" name="role" required>
+                            <option value="User">User</option>
+                            {% if current_user.role == 'GlobalAdmin' %}
+                            <option value="Admin">Admin</option>
+                            <option value="GlobalAdmin">Global Admin</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="form-check mt-4">
+                            <input type="checkbox" class="form-check-input" id="is_active" name="is_active">
+                            <label class="form-check-label" for="is_active">Account Active</label>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Create User</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Existing Users</h5>
+            <div class="table-responsive">
+                <table class="table table-striped" id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Companies</th>
+                            <th>Status</th>
+                            <th>2FA</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>
+                                {% if current_user.role == 'GlobalAdmin' and user.id != current_user.id %}
+                                <!-- Role dropdown for Global Admins -->
+                                <div class="dropdown">
+                                    <button class="btn btn-sm dropdown-toggle 
+                                        {% if user.role == 'GlobalAdmin' %}btn-danger
+                                        {% elif user.role == 'Admin' %}btn-warning
+                                        {% else %}btn-info{% endif %}" 
+                                        type="button" data-bs-toggle="dropdown">
+                                        {{ user.role }}
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="#" onclick="changeUserRole({{ user.id }}, 'User')">User</a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="changeUserRole({{ user.id }}, 'Admin')">Admin</a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="changeUserRole({{ user.id }}, 'GlobalAdmin')">Global Admin</a></li>
+                                    </ul>
+                                </div>
+                                {% else %}
+                                <!-- Static display for non-Global Admins or current user -->
+                                {% if user.role == 'GlobalAdmin' %}
+                                <span class="badge bg-danger">Global Admin</span>
+                                {% elif user.role == 'Admin' %}
+                                <span class="badge bg-warning">Admin</span>
+                                {% else %}
+                                <span class="badge bg-info">User</span>
+                                {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-secondary" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#companiesModal{{ user.id }}">
+                                    {% if user.filtered_companies %}
+                                        {{ user.filtered_companies|length }} Companies
+                                    {% else %}
+                                        No Companies
+                                    {% endif %}
+                                </button>
+                                
+                                <!-- Company Management Modal -->
+                                <div class="modal fade" id="companiesModal{{ user.id }}" tabindex="-1">
+                                    <div class="modal-dialog modal-lg">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Manage Companies for {{ user.username }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <!-- Current Companies -->
+                                                <h6>Current Companies:</h6>
+                                                {% if current_user.role == 'Admin' and user.companies|length > user.filtered_companies|length %}
+                                                <div class="alert alert-info" role="alert">
+                                                    <small><i class="fas fa-info-circle"></i> 
+                                                    This user belongs to {{ user.companies|length }} companies total, but you can only see and manage {{ user.filtered_companies|length }} companies that you also have access to.</small>
+                                                </div>
+                                                {% endif %}
+                                                <div class="table-responsive mb-3">
+                                                    <table class="table table-sm">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Company</th>
+                                                                <th>Role</th>
+                                                                <th>Actions</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="currentCompanies{{ user.id }}">
+                                                            {% if user.filtered_companies %}
+                                                            {% for uc in user.filtered_companies %}
+                                                            <tr id="company-row-{{ user.id }}-{{ uc.company_id }}">
+                                                                <td>{{ uc.company.name }}</td>
+                                                                <td>
+                                                                    {% if current_user.role == 'GlobalAdmin' or (current_user.role == 'Admin' and user.role not in ['Admin', 'GlobalAdmin']) %}
+                                                                    <select class="form-select form-select-sm" 
+                                                                            onchange="changeCompanyRole({{ user.id }}, {{ uc.company_id }}, this.value)">
+                                                                        <option value="User" {% if uc.role == 'User' %}selected{% endif %}>User</option>
+                                                                        {% if current_user.role == 'GlobalAdmin' %}
+                                                                        <option value="CompanyAdmin" {% if uc.role == 'CompanyAdmin' %}selected{% endif %}>Company Admin</option>
+                                                                        {% endif %}
+                                                                    </select>
+                                                                    {% else %}
+                                                                    <span class="badge {% if uc.role == 'CompanyAdmin' %}bg-warning{% else %}bg-info{% endif %}">
+                                                                        {{ uc.role }}
+                                                                    </span>
+                                                                    {% endif %}
+                                                                </td>
+                                                                <td>
+                                                                    {% if current_user.role == 'GlobalAdmin' or (current_user.role == 'Admin' and user.role not in ['Admin', 'GlobalAdmin']) %}
+                                                                    <button class="btn btn-sm btn-danger" 
+                                                                            onclick="removeFromCompany({{ user.id }}, {{ uc.company_id }})">
+                                                                        Remove
+                                                                    </button>
+                                                                    {% endif %}
+                                                                </td>
+                                                            </tr>
+                                                            {% endfor %}
+                                                            {% else %}
+                                                            <tr id="no-companies-row-{{ user.id }}">
+                                                                <td colspan="3" class="text-muted text-center">
+                                                                    User is not associated with any companies.
+                                                                </td>
+                                                            </tr>
+                                                            {% endif %}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+
+                                                <!-- Add to Company Section -->
+                                                {% if current_user.role == 'GlobalAdmin' or (current_user.role == 'Admin' and user.role not in ['Admin', 'GlobalAdmin']) %}
+                                                <hr>
+                                                <h6>Add to Company:</h6>
+                                                <div class="row mb-3">
+                                                    <div class="col-md-6">
+                                                        <select class="form-select" id="addCompanySelect{{ user.id }}">
+                                                            <option value="">Select a company...</option>
+                                                            <!-- Options will be populated by JavaScript -->
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <select class="form-select" id="addCompanyRole{{ user.id }}">
+                                                            <option value="User">User</option>
+                                                            {% if current_user.role == 'GlobalAdmin' %}
+                                                            <option value="CompanyAdmin">Company Admin</option>
+                                                            {% endif %}
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <button class="btn btn-primary" onclick="addToCompany({{ user.id }})">
+                                                            Add to Company
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Create New Company Section (GlobalAdmin only) -->
+                                                {% if current_user.role == 'GlobalAdmin' %}
+                                                <div class="border-top pt-3">
+                                                    <h6>Create New Company:</h6>
+                                                    <div class="row">
+                                                        <div class="col-md-6">
+                                                            <input type="text" class="form-control" 
+                                                                   id="newCompanyName{{ user.id }}" 
+                                                                   placeholder="Company name...">
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <select class="form-select" id="newCompanyRole{{ user.id }}">
+                                                                <option value="User">User</option>
+                                                                <option value="CompanyAdmin">Company Admin</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <button class="btn btn-success" onclick="createAndAddCompany({{ user.id }})">
+                                                                Create & Add
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {% endif %}
+                                                {% endif %}
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge {% if user.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                    {{ 'Active' if user.is_active else 'Inactive' }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge {% if user.mfa_enabled %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {{ 'Enabled' if user.mfa_enabled else 'Disabled' }}
+                                </span>
+                                {% if current_user.role == 'GlobalAdmin' %}
+                                <br><small class="text-muted">
+                                    Required: 
+                                    {% if user.mfa_required is none %}
+                                        <span class="badge bg-info">Inherit</span>
+                                    {% elif user.mfa_required %}
+                                        <span class="badge bg-warning">Yes</span>
+                                    {% else %}
+                                        <span class="badge bg-success">No</span>
+                                    {% endif %}
+                                </small>
+                                <br>
+                                <div class="btn-group btn-group-sm mt-1" role="group">
+                                    <button type="button" class="btn btn-outline-info btn-xs" 
+                                            onclick="updateMfaRequirement({{ user.id }}, null)"
+                                            {% if user.mfa_required is none %}disabled{% endif %}>
+                                        Inherit
+                                    </button>
+                                    <button type="button" class="btn btn-outline-warning btn-xs" 
+                                            onclick="updateMfaRequirement({{ user.id }}, true)"
+                                            {% if user.mfa_required == true %}disabled{% endif %}>
+                                        Required
+                                    </button>
+                                    <button type="button" class="btn btn-outline-success btn-xs" 
+                                            onclick="updateMfaRequirement({{ user.id }}, false)"
+                                            {% if user.mfa_required == false %}disabled{% endif %}>
+                                        Not Required
+                                    </button>
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    {% if current_user.is_global_admin() or (current_user.role == 'Admin' and user.role != 'GlobalAdmin' and user.role != 'Admin') %}
+                                    <button type="button" class="btn btn-sm btn-warning" 
+                                            onclick="toggleUserStatus({{ user.id }}, this)"
+                                            {% if user.id == current_user.id %}disabled title="You cannot deactivate your own account"{% endif %}>
+                                        {{ 'Deactivate' if user.is_active else 'Activate' }}
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-info" 
+                                            onclick="showResetPasswordModal({{ user.id }})"
+                                            {% if user.id == current_user.id %}disabled title="Use your profile page to change your own password"{% endif %}>
+                                        Reset Password
+                                    </button>
+                                    {% if user.mfa_secret %}
+                                    <form action="{{ url_for('auth.admin_reset_mfa', user_id=user.id) }}" 
+                                          method="POST" style="display: inline;"
+                                          onsubmit="return confirm('Are you sure you want to reset 2FA for this user? They will need to set it up again.');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-secondary"
+                                               {% if user.id == current_user.id %}disabled title="Use your profile page to manage your own 2FA"{% endif %}>
+                                            Reset 2FA
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    {% if user.id != current_user.id %}
+                                    <form action="{{ url_for('auth.delete_user', user_id=user.id) }}" 
+                                          method="POST" style="display: inline;"
+                                          onsubmit="return confirm('Are you sure you want to delete this user?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                    </form>
+                                    {% endif %}
+                                    {% else %}
+                                    <button type="button" class="btn btn-sm btn-secondary" disabled title="You don't have permission to manage this user">
+                                        No Actions Available
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast container for notifications -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <!-- Toasts will be inserted here dynamically -->
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reset User Password</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="resetPasswordForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Reset Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- DataTables JS -->
+<script src="{{ url_for('static', filename='js/jquery.dataTables.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dataTables.bootstrap5.min.js') }}"></script>
+
+<script>
+// Get current user role for permission checks
+const currentUserRole = '{{ current_user.role }}';
+
+// Function to create and display toast notifications
+function createToast(type, message) {
+    const toastContainer = document.querySelector('.toast-container');
+    
+    // Create toast element
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast align-items-center text-white bg-${type} border-0`;
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'assertive');
+    toastEl.setAttribute('aria-atomic', 'true');
+    
+    // Create toast content
+    const toastContent = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    `;
+    
+    toastEl.innerHTML = toastContent;
+    toastContainer.appendChild(toastEl);
+    
+    // Create Bootstrap toast instance
+    const toast = new bootstrap.Toast(toastEl, {
+        delay: 5000,
+        autohide: true
+    });
+    
+    // Remove toast element after it's hidden
+    toastEl.addEventListener('hidden.bs.toast', () => {
+        toastEl.remove();
+    });
+    
+    return toast;
+}
+
+function toggleUserStatus(userId, button) {
+    const baseUrl = '{{ url_for("auth.toggle_user_status", user_id=1) }}'.replace('/1', '/' + userId);
+    fetch(baseUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json().then(data => {
+                // Show success message
+                const toast = createToast('success', 'User status updated successfully');
+                toast.show();
+                setTimeout(() => location.reload(), 1000);
+            });
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Failed to toggle user status');
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        const toast = createToast('danger', error.message || 'Failed to toggle user status');
+        toast.show();
+    });
+}
+
+function showResetPasswordModal(userId) {
+    const modal = new bootstrap.Modal(document.getElementById('resetPasswordModal'));
+    const baseUrl = '{{ url_for("auth.reset_user_password", user_id=1) }}'.replace('/1', '/' + userId);
+    document.getElementById('resetPasswordForm').action = baseUrl;
+    modal.show();
+}
+
+// Add function to handle changing user roles
+function changeUserRole(userId, role) {
+    if (confirm(`Are you sure you want to change this user's role to ${role}?`)) {
+        const baseUrl = '{{ url_for("auth.change_user_role", user_id=1) }}'.replace('/1', '/' + userId);
+        fetch(baseUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({ role: role })
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                response.json().then(data => {
+                    alert(data.error || 'Failed to change user role');
+                }).catch(() => {
+                    alert('Failed to change user role');
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to change user role');
+        });
+    }
+}
+
+// Add function to handle MFA requirement updates
+function updateMfaRequirement(userId, mfaRequired) {
+    const actionText = mfaRequired === null ? 'inherit from global setting' : 
+                      mfaRequired ? 'require MFA' : 'not require MFA';
+    
+    if (confirm(`Are you sure you want to set this user to ${actionText}?`)) {
+        const baseUrl = '{{ url_for("auth.update_user_mfa_requirement", user_id=1) }}'.replace('/1', '/' + userId);
+        fetch(baseUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({ mfa_required: mfaRequired })
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.json().then(data => {
+                    const toast = createToast('success', data.message);
+                    toast.show();
+                    setTimeout(() => location.reload(), 1000);
+                });
+            } else {
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to update MFA requirement');
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            const toast = createToast('danger', error.message || 'Failed to update MFA requirement');
+            toast.show();
+        });
+    }
+}
+
+// Company management functions
+function loadAvailableCompanies(userId) {
+    const select = document.getElementById(`addCompanySelect${userId}`);
+    
+    // If the select element doesn't exist (e.g., Admin viewing another Admin), skip loading
+    if (!select) {
+        console.log(`Add Company select not found for user ${userId} - user likely doesn't have permission to manage this user's companies`);
+        return;
+    }
+    
+    fetch('{{ url_for("auth.get_companies_for_user_management") }}')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Clear existing options except the first one
+            select.innerHTML = '<option value="">Select a company...</option>';
+            
+            // Handle the response format (companies array is in data.companies)
+            const companies = data.companies || data || [];
+            
+            companies.forEach(company => {
+                const option = document.createElement('option');
+                option.value = company.id;
+                option.textContent = company.name;
+                select.appendChild(option);
+            });
+            
+            console.log(`Loaded ${companies.length} companies for user ${userId}`);
+        })
+        .catch(error => {
+            console.error('Error loading companies:', error);
+            const toast = createToast('danger', `Failed to load available companies: ${error.message}`);
+            toast.show();
+        });
+}
+
+function addToCompany(userId) {
+    const companySelect = document.getElementById(`addCompanySelect${userId}`);
+    const roleSelect = document.getElementById(`addCompanyRole${userId}`);
+    
+    const companyId = companySelect.value;
+    const role = roleSelect.value;
+    
+    if (!companyId) {
+        const toast = createToast('warning', 'Please select a company');
+        toast.show();
+        return;
+    }
+    
+    const baseUrl = '{{ url_for("auth.add_user_to_company", user_id=1) }}'.replace('/1', '/' + userId);
+    fetch(baseUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            company_id: parseInt(companyId),
+            role: role
+        })
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Failed to add user to company');
+            });
+        }
+    })
+    .then(data => {
+        const toast = createToast('success', data.message);
+        toast.show();
+        
+        // Add new row to the current companies table
+        const tbody = document.getElementById(`currentCompanies${userId}`);
+        if (tbody) {
+            // Remove "no companies" row if it exists
+            const noCompaniesRow = document.getElementById(`no-companies-row-${userId}`);
+            if (noCompaniesRow) {
+                noCompaniesRow.remove();
+            }
+            
+            const newRow = document.createElement('tr');
+            newRow.id = `company-row-${userId}-${companyId}`;
+            newRow.innerHTML = `
+                <td>${companySelect.options[companySelect.selectedIndex].text}</td>
+                <td>
+                    <select class="form-select form-select-sm" 
+                            onchange="changeCompanyRole(${userId}, ${companyId}, this.value)">
+                        <option value="User" ${role === 'User' ? 'selected' : ''}>User</option>
+                        ${currentUserRole === 'GlobalAdmin' ? `<option value="CompanyAdmin" ${role === 'CompanyAdmin' ? 'selected' : ''}>Company Admin</option>` : ''}
+                    </select>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-danger" 
+                            onclick="removeFromCompany(${userId}, ${companyId})">
+                        Remove
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(newRow);
+        }
+        
+        // Reset the form
+        companySelect.value = '';
+        roleSelect.value = 'User';
+        
+        // Remove the selected company from the dropdown
+        const selectedOption = companySelect.querySelector(`option[value="${companyId}"]`);
+        if (selectedOption) {
+            selectedOption.remove();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        const toast = createToast('danger', error.message);
+        toast.show();
+    });
+}
+
+function removeFromCompany(userId, companyId) {
+    if (!confirm('Are you sure you want to remove this user from the company?')) {
+        return;
+    }
+    
+    const baseUrl = '{{ url_for("auth.remove_user_from_company", user_id=1, company_id=1) }}'.replace('/1/companies/1/', `/${userId}/companies/${companyId}/`);
+    fetch(baseUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Failed to remove user from company');
+            });
+        }
+    })
+    .then(data => {
+        const toast = createToast('success', data.message);
+        toast.show();
+        
+        // Remove the row from the table
+        const row = document.getElementById(`company-row-${userId}-${companyId}`);
+        if (row) {
+            const companyName = row.querySelector('td').textContent;
+            row.remove();
+            
+            // Check if this was the last company row
+            const tbody = document.getElementById(`currentCompanies${userId}`);
+            const remainingRows = tbody.querySelectorAll('tr:not([id^="no-companies-row"])');
+            if (remainingRows.length === 0) {
+                // Add the "no companies" row back
+                const noCompaniesRow = document.createElement('tr');
+                noCompaniesRow.id = `no-companies-row-${userId}`;
+                noCompaniesRow.innerHTML = `
+                    <td colspan="3" class="text-muted text-center">
+                        User is not associated with any companies.
+                    </td>
+                `;
+                tbody.appendChild(noCompaniesRow);
+            }
+            
+            // Add the company back to the dropdown
+            const select = document.getElementById(`addCompanySelect${userId}`);
+            const option = document.createElement('option');
+            option.value = companyId;
+            option.textContent = companyName;
+            select.appendChild(option);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        const toast = createToast('danger', error.message);
+        toast.show();
+    });
+}
+
+function changeCompanyRole(userId, companyId, newRole) {
+    const baseUrl = '{{ url_for("auth.change_user_company_role", user_id=1, company_id=1) }}'.replace('/1/companies/1/', `/${userId}/companies/${companyId}/`);
+    fetch(baseUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({ role: newRole })
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Failed to change company role');
+            });
+        }
+    })
+    .then(data => {
+        const toast = createToast('success', data.message);
+        toast.show();
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        const toast = createToast('danger', error.message);
+        toast.show();
+        // Revert the select value on error
+        location.reload();
+    });
+}
+
+function createAndAddCompany(userId) {
+    const nameInput = document.getElementById(`newCompanyName${userId}`);
+    const roleSelect = document.getElementById(`newCompanyRole${userId}`);
+    
+    const companyName = nameInput.value.trim();
+    const role = roleSelect.value;
+    
+    if (!companyName) {
+        const toast = createToast('warning', 'Please enter a company name');
+        toast.show();
+        return;
+    }
+    
+    fetch('{{ url_for("auth.create_company_from_manage_users") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            name: companyName,
+            user_id: userId,
+            role: role
+        })
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Failed to create company');
+            });
+        }
+    })
+    .then(data => {
+        const toast = createToast('success', data.message);
+        toast.show();
+        
+        // Add new row to the current companies table
+        const tbody = document.getElementById(`currentCompanies${userId}`);
+        if (tbody) {
+            // Remove "no companies" row if it exists
+            const noCompaniesRow = document.getElementById(`no-companies-row-${userId}`);
+            if (noCompaniesRow) {
+                noCompaniesRow.remove();
+            }
+            
+            const newRow = document.createElement('tr');
+            newRow.id = `company-row-${userId}-${data.company_id}`;
+            newRow.innerHTML = `
+                <td>${companyName}</td>
+                <td>
+                    <select class="form-select form-select-sm" 
+                            onchange="changeCompanyRole(${userId}, ${data.company_id}, this.value)">
+                        <option value="User" ${role === 'User' ? 'selected' : ''}>User</option>
+                        ${currentUserRole === 'GlobalAdmin' ? `<option value="CompanyAdmin" ${role === 'CompanyAdmin' ? 'selected' : ''}>Company Admin</option>` : ''}
+                    </select>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-danger" 
+                            onclick="removeFromCompany(${userId}, ${data.company_id})">
+                        Remove
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(newRow);
+        } else {
+            console.warn(`Table body currentCompanies${userId} not found`);
+            // Just reload the page if we can't update the table
+            setTimeout(() => location.reload(), 1000);
+        }
+        
+        // Reset the form
+        nameInput.value = '';
+        roleSelect.value = 'User';
+        
+        // Add the new company to all dropdown lists
+        document.querySelectorAll('[id^="addCompanySelect"]').forEach(select => {
+            const option = document.createElement('option');
+            option.value = data.company_id;
+            option.textContent = companyName;
+            select.appendChild(option);
+        });
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        const toast = createToast('danger', error.message);
+        toast.show();
+    });
+}
+
+// Load available companies when modal is opened
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners for when company modals are shown
+    document.querySelectorAll('[id^="companiesModal"]').forEach(modal => {
+        modal.addEventListener('shown.bs.modal', function() {
+            const userId = this.id.replace('companiesModal', '');
+            loadAvailableCompanies(userId);
+        });
+    });
+});
+
+$(document).ready(function() {
+    $('#usersTable').DataTable({
+        "pageLength": 10,
+        "order": [[0, "asc"]]
+    });
+});
+</script>
+{% endblock %}

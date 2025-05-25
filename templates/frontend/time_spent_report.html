@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% block head %}
+    <!-- DataTables CSS -->
+    <link href="{{ url_for('static', filename='css/dataTables.bootstrap5.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/buttons.bootstrap5.min.css') }}" rel="stylesheet">
+    <!-- DateRangePicker CSS -->
+    <link href="{{ url_for('static', filename='css/daterangepicker.css') }}" rel="stylesheet">
+    <style>
+        .btn-group-toggle .btn {
+            margin-right: 5px;
+        }
+        .dataTables_wrapper .dt-buttons {
+            margin-bottom: 15px;
+        }
+        .dt-button {
+            margin-right: 5px;
+        }
+        /* Custom DateRangePicker dark theme styles */
+        .daterangepicker {
+            background-color: #212529;
+            border-color: #495057;
+            color: #f8f9fa;
+        }
+        .daterangepicker .calendar-table {
+            background-color: #343a40;
+            border-color: #495057;
+        }
+        .daterangepicker td.available:hover, 
+        .daterangepicker th.available:hover {
+            background-color: #495057;
+        }
+        .daterangepicker td.active, 
+        .daterangepicker td.active:hover {
+            background-color: #0d6efd;
+            color: #fff;
+        }
+        /* In-between dates in the selected range - lighter blue */
+        .daterangepicker td.in-range {
+            background-color: #82b1ff; /* Lighter blue */
+            color: #212529; /* Darker text for better contrast */
+        }
+        .daterangepicker td.in-range:hover {
+            background-color: #75a7f7; /* Slightly darker when hovering */
+            color: #212529;
+        }
+        .daterangepicker .calendar-table .next span, 
+        .daterangepicker .calendar-table .prev span {
+            border-color: #f8f9fa;
+        }
+        .daterangepicker .ranges li:hover,
+        .daterangepicker .ranges li.active {
+            background-color: #0d6efd;
+            color: #fff;
+        }
+        .daterangepicker .ranges li {
+            color: #f8f9fa;
+        }
+        .daterangepicker:after {
+            border-bottom-color: #212529;
+        }
+        .daterangepicker:before {
+            border-bottom-color: #495057;
+        }
+        /* Calendar header and weekday styling */
+        .daterangepicker .calendar-table th {
+            color: #f8f9fa;
+        }
+        /* Month name */
+        .daterangepicker .month {
+            color: #f8f9fa;
+        }
+        /* Off days (not in current month) */
+        .daterangepicker td.off {
+            color: #6c757d;
+        }
+        /* Input boxes */
+        .daterangepicker input.input-mini {
+            background-color: #343a40;
+            border-color: #495057;
+            color: #f8f9fa;
+        }
+        /* Time picker */
+        .daterangepicker .calendar-time select {
+            background-color: #343a40;
+            border-color: #495057;
+            color: #f8f9fa;
+        }
+        /* Apply and cancel buttons */
+        .daterangepicker .drp-buttons {
+            border-top-color: #495057;
+        }
+        .daterangepicker .drp-buttons .btn {
+            color: #f8f9fa;
+        }
+        /* Input fields focus */
+        .daterangepicker input.input-mini:focus {
+            border-color: #0d6efd;
+        }
+        /* Time inputs container */
+        .daterangepicker .calendar-time {
+            background-color: #343a40;
+            border-color: #495057;
+        }
+        /* Make the export buttons more visible */
+        .dt-buttons {
+            margin-top: 10px;
+            margin-bottom: 15px;
+            display: block !important;
+        }
+        .dt-button {
+            margin-right: 5px;
+        }
+        /* Align the "Show entries" and search box in the same row */
+        div.dataTables_wrapper div.dataTables_length {
+            float: left;
+            padding-top: 0.5em;
+        }
+        div.dataTables_wrapper div.dataTables_filter {
+            float: right;
+        }
+        div.dataTables_wrapper div.dataTables_info {
+            clear: both;
+        }
+    </style>
+{% endblock %}
+
+{% block title %}Time Spent Report{% endblock %}
+{% block content %}
+    <div class="container-fluid mt-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2>Time Spent Report</h2>
+            <div class="export-buttons d-flex align-items-center">
+                <!-- Process span option moved here -->
+                <div class="form-check me-3">
+                    <input type="checkbox" class="form-check-input" name="continue_iterate" id="continue_iterate" form="reportFilterForm" {% if continue_iterate %}checked{% endif %}>
+                    <label class="form-check-label" for="continue_iterate" data-bs-toggle="tooltip" data-bs-placement="top" 
+                          title="When enabled, the system will continue processing time spans across midnight for multi-day sessions. When disabled, each day's activity is calculated separately.">
+                        Process multi-day sessions
+                    </label>
+                </div>
+                <!-- Export buttons will be placed here by DataTables -->
+            </div>
+        </div>
+        
+        <div class="card mt-3 mb-3">
+            <div class="card-body">
+                <form id="reportFilterForm" method="GET" action="{{ url_for('frontend.time_spent_report') }}">
+                    <div class="row align-items-end">
+                        <div class="col-md-3">
+                            <label for="daterange" class="form-label">Date Range:</label>
+                            <input type="text" id="daterange" name="daterange" class="form-control" 
+                                   value="{{ start_date.strftime('%Y-%m-%d %H:%M') if start_date else '' }} - {{ end_date.strftime('%Y-%m-%d %H:%M') if end_date else '' }}"/>
+                        </div>
+                        
+                        {% if companies %}
+                        <div class="col-md-2">
+                            <label for="company_id" class="form-label">Company:</label>
+                            <select class="form-select" id="company_id" name="company_id">
+                                <option value="">All Companies</option>
+                                {% for company in companies %}
+                                <option value="{{ company.id }}" {% if selected_company_id == company.id %}selected{% endif %}>
+                                    {{ company.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="col-md-3">
+                            <label for="group_by" class="form-label">Group By:</label>
+                            <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                                <input type="radio" class="btn-check" name="group_by" id="option1" value="user" {% if group_by == 'user' or not group_by %}checked{% endif %}>
+                                <label class="btn btn-outline-primary btn-sm" for="option1">User</label>
+                                
+                                <input type="radio" class="btn-check" name="group_by" id="option2" value="user_computer" {% if group_by == 'user_computer' %}checked{% endif %}>
+                                <label class="btn btn-outline-primary btn-sm" for="option2">User + Computer</label>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-2 mt-3">
+                            <button type="submit" class="btn btn-primary">Apply Filter</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <table id="timeSpentTable" class="table table-striped table-bordered" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>User Name</th>
+                            {% if group_by == 'user_computer' %}
+                            <th>Computer Name</th>
+                            {% endif %}
+                            <th>Company</th>
+                            <th>Total Time</th>
+                            <th>First Login</th>
+                            <th>Last Logout</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in time_data %}
+                        <tr>
+                            <td>{{ entry.date }}</td>
+                            <td>{{ entry.user_name }}</td>
+                            {% if group_by == 'user_computer' %}
+                            <td>{{ entry.computer_name }}</td>
+                            {% endif %}
+                            <td>{{ entry.company_name }}</td>
+                            <td data-order="{{ entry.total_seconds }}">{{ entry.formatted_time }}</td>
+                            <td data-order="{{ entry.first_login.strftime('%Y%m%d%H%M%S') if entry.first_login else '' }}">
+                                {{ entry.first_login|format_datetime if entry.first_login else 'N/A' }}
+                            </td>
+                            <td data-order="{{ entry.last_logout.strftime('%Y%m%d%H%M%S') if entry.last_logout else '' }}">
+                                {{ entry.last_logout|format_datetime if entry.last_logout else 'N/A' }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <!-- DataTables JS -->
+    <script src="{{ url_for('static', filename='js/jquery.dataTables.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dataTables.bootstrap5.min.js') }}"></script>
+    <!-- DataTables Buttons JS -->
+    <script src="{{ url_for('static', filename='js/dataTables.buttons.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/buttons.bootstrap5.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/buttons.html5.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/buttons.print.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/jszip.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pdfmake.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/vfs_fonts.js') }}"></script>
+    <!-- Moment.js -->
+    <script src="{{ url_for('static', filename='js/moment.min.js') }}"></script>
+    <!-- DateRangePicker -->
+    <script src="{{ url_for('static', filename='js/daterangepicker.min.js') }}"></script>
+    <script>
+        $(document).ready(function() {
+            // Initialize date range picker
+            $('#daterange').daterangepicker({
+                timePicker: true,
+                timePicker24Hour: true,
+                timePickerSeconds: false,
+                startDate: moment().subtract(7, 'days'),
+                endDate: moment(),
+                locale: {
+                    format: 'YYYY-MM-DD HH:mm'
+                }
+            });
+
+            // Initialize tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl)
+            });
+
+            // Initialize DataTable with export buttons
+            var table = $('#timeSpentTable').DataTable({
+                dom: 'lfrBtip',
+                buttons: [
+                    {
+                        extend: 'csv',
+                        text: 'Export CSV',
+                        className: 'btn btn-primary btn-sm',
+                        exportOptions: {
+                            columns: ':visible'
+                        }
+                    },
+                    {
+                        extend: 'excel',
+                        text: 'Export Excel',
+                        className: 'btn btn-success btn-sm',
+                        exportOptions: {
+                            columns: ':visible'
+                        }
+                    },
+                    {
+                        extend: 'print',
+                        text: 'Print',
+                        className: 'btn btn-info btn-sm',
+                        exportOptions: {
+                            columns: ':visible'
+                        }
+                    }
+                ],
+                order: [[0, 'desc']],
+                pageLength: 25
+            });
+            
+            // Move export buttons to the header
+            table.buttons().container().appendTo('.export-buttons');
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,15 @@
+[data-bs-theme="dark"] {
+    --bs-body-bg: #212529;
+    --bs-body-color: #f8f9fa;
+    --bs-card-bg: #2c3034;
+    --bs-dropdown-bg: #2c3034;
+    --bs-dropdown-link-hover-bg: #373b3e;
+    --bs-dropdown-link-color: #f8f9fa;
+    --bs-dropdown-link-hover-color: #ffffff;
+}
+
+[data-bs-theme="light"] {
+    --bs-body-bg: #ffffff;
+    --bs-body-color: #212529;
+    --bs-card-bg: #ffffff;
+}

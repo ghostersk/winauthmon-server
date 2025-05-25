@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-6 offset-md-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Login</h3>
+                    </div>
+                    <div class="card-body">
+                        {% if error_message %}
+                            <div class="alert alert-danger">{{ error_message }}</div>
+                        {% endif %}
+                        <form id="loginForm" method="POST" action="">
+                            {{ form.hidden_tag() }}
+                            <div class="mb-3">
+                                {{ form.email.label(class="form-label") }}
+                                {{ form.email(class="form-control") }}
+                                {% if form.email.errors %}
+                                    {% for error in form.email.errors %}
+                                        <div class="text-danger">{{ error }}</div>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.password.label(class="form-label") }}
+                                {{ form.password(class="form-control") }}
+                                {% if form.password.errors %}
+                                    {% for error in form.password.errors %}
+                                        <div class="text-danger">{{ error }}</div>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                            <div class="mb-3 form-check">
+                                {{ form.remember(class="form-check-input") }}
+                                {{ form.remember.label(class="form-check-label") }}
+                            </div>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </form>
+                    </div>
+                    {% if allow_registration %}
+                    <div class="card-footer">
+                        <small>Need an account? <a href="{{ url_for('auth.register') }}">Sign up now</a></small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div class="modal fade" id="loginErrorModal" tabindex="-1" aria-labelledby="loginErrorModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="loginErrorModalLabel">Login Error</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" id="loginErrorModalBody">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% include 'auth/mfa_modal.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Get CSRF token from the rendered template
+const csrfToken = '{{ csrf_token() }}';
+
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    fetch('{{ url_for("auth.login") }}', {
+        method: 'POST',
+        body: new FormData(this),
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json().then(data => ({status: response.status, body: data})))
+    .then(({status, body}) => {
+        if (body.require_mfa) {
+            const modal = new bootstrap.Modal(document.getElementById('mfaModal'));
+            modal.show();
+        } else if (body.require_mfa_setup) {
+            // Redirect to MFA setup for required users
+            window.location.href = '{{ url_for("auth.setup_mfa") }}';
+        } else if (body.redirect) {
+            window.location.href = body.redirect;
+        } else if (body.error) {
+            document.getElementById('loginErrorModalBody').textContent = body.error;
+            const errorModal = new bootstrap.Modal(document.getElementById('loginErrorModal'));
+            errorModal.show();
+        }
+    })
+    .catch(error => {
+        document.getElementById('loginErrorModalBody').textContent = 'An unexpected error occurred.';
+        const errorModal = new bootstrap.Modal(document.getElementById('loginErrorModal'));
+        errorModal.show();
+    });
+});
+
+document.getElementById('mfaForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    fetch('{{ url_for("auth.verify_mfa") }}', {
+        method: 'POST',
+        body: new FormData(this),
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.redirect) {
+            window.location.href = data.redirect;
+        } else {
+            alert('Invalid MFA code');
+        }
+    })
+    .catch(error => {
+        alert('Failed to verify MFA code');
+    });
+});
+</script>
+{% endblock %}

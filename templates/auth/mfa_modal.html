@@ -1,0 +1,22 @@
+<!-- MFA Verification Modal -->
+<div class="modal fade" id="mfaModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Two-Factor Authentication</h5>
+            </div>
+            <form id="mfaForm" method="POST" action="{{ url_for('auth.verify_mfa') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="mfa_code" class="form-label">Enter the 6-digit code from your authenticator app</label>
+                        <input type="text" class="form-control" id="mfa_code" name="mfa_code" 
+                               required pattern="[0-9]{6}" maxlength="6">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Verify</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

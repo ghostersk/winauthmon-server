@@ -1,0 +1,118 @@
+nohup: ignoring input
+2025-05-25 05:20:10,213 - __main__ - INFO - No specific proxy IPs configured - trusting all proxies
+2025-05-25 05:20:10,229 - utils.rate_limiter - INFO - No Redis URL configured, using in-memory rate limiting
+2025-05-25 05:20:10,243 - app - INFO - Database logging initialized
+2025-05-25 05:20:10,244 - __main__ - INFO - Starting application on 0.0.0.0:8000 with SSL
+2025-05-25 05:20:10,244 - __main__ - INFO - SSL certificate: instance/certs/cert.pem
+2025-05-25 05:20:10,244 - __main__ - INFO - SSL key: instance/certs/key.pem
+2025-05-25 05:20:10,244 - __main__ - INFO - Development mode: False
+2025-05-25 05:20:10,244 - __main__ - INFO - File watching: False
+2025-05-25 05:20:10,244 - __main__ - INFO - Workers: 2
+2025-05-25 05:20:10,244 - __main__ - INFO - Uvicorn allowing all IPs for forwarded headers
+INFO:     Uvicorn running on https://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started parent process [7718]
+2025-05-25 05:20:10,568 - __mp_main__ - INFO - No specific proxy IPs configured - trusting all proxies
+2025-05-25 05:20:10,571 - __mp_main__ - INFO - No specific proxy IPs configured - trusting all proxies
+2025-05-25 05:20:10,586 - utils.rate_limiter - INFO - No Redis URL configured, using in-memory rate limiting
+2025-05-25 05:20:10,589 - utils.rate_limiter - INFO - No Redis URL configured, using in-memory rate limiting
+2025-05-25 05:20:10,602 - __mp_main__ - INFO - Database logging initialized
+2025-05-25 05:20:10,605 - __mp_main__ - INFO - Database logging initialized
+2025-05-25 05:20:10,620 - app - INFO - No specific proxy IPs configured - trusting all proxies
+2025-05-25 05:20:10,623 - app - INFO - No specific proxy IPs configured - trusting all proxies
+2025-05-25 05:20:10,632 - utils.rate_limiter - INFO - No Redis URL configured, using in-memory rate limiting
+2025-05-25 05:20:10,635 - utils.rate_limiter - INFO - No Redis URL configured, using in-memory rate limiting
+2025-05-25 05:20:10,636 - app - INFO - Database logging initialized
+INFO:     Started server process [7721]
+INFO:     Waiting for application startup.
+INFO:     ASGI 'lifespan' protocol appears unsupported.
+INFO:     Application startup complete.
+2025-05-25 05:20:10,639 - app - INFO - Database logging initialized
+INFO:     Started server process [7722]
+INFO:     Waiting for application startup.
+INFO:     ASGI 'lifespan' protocol appears unsupported.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:49078 - "GET / HTTP/1.1" 200 OK
+2025-05-25 05:21:45,554 - frontend.routes - WARNING - TEST: Warning level log from /test-error-logging route
+2025-05-25 05:21:45,557 - frontend.routes - ERROR - TEST: Error level log from /test-error-logging route
+2025-05-25 05:21:45,559 - frontend.routes - CRITICAL - TEST: Critical level log from /test-error-logging route
+2025-05-25 05:21:45,562 - app - WARNING - TEST: Flask app warning from test route
+2025-05-25 05:21:45,564 - app - ERROR - TEST: Flask app error from test route
+2025-05-25 05:21:45,567 - frontend.routes - ERROR - TEST: Exception caught in test route
+Traceback (most recent call last):
+  File "/opt/dockerbuilds/domain-logons/frontend/routes.py", line 42, in test_error_logging
+    raise ValueError("TEST: Intentional exception for database logging verification")
+ValueError: TEST: Intentional exception for database logging verification
+2025-05-25 05:21:45,569 - app - ERROR - TEST: Flask app exception in test route
+Traceback (most recent call last):
+  File "/opt/dockerbuilds/domain-logons/frontend/routes.py", line 42, in test_error_logging
+    raise ValueError("TEST: Intentional exception for database logging verification")
+ValueError: TEST: Intentional exception for database logging verification
+INFO:     127.0.0.1:54616 - "GET /test-error-logging HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /auth/admin/error_logs?start_date=2025-05-18&end_date=2025-05-25&level= HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/img/favicon.png HTTP/1.1" 304 Not Modified
+INFO:     213.249.224.235:0 - "GET /auth/admin/error_logs?start_date=2025-05-18&end_date=2025-05-25&level= HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/css/custom.css HTTP/1.1" 304 Not Modified
+INFO:     213.249.224.235:0 - "GET /static/img/favicon.png HTTP/1.1" 304 Not Modified
+INFO:     213.249.224.235:0 - "GET /static/css/buttons.bootstrap5.min.css HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/css/buttons.dataTables.min.css HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/css/bootstrap.min.css HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/css/dataTables.bootstrap5.min.css HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/js/jquery-3.6.0.min.js HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/js/jquery.dataTables.min.js HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/js/bootstrap.bundle.min.js HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/js/buttons.html5.min.js HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/js/dataTables.bootstrap5.min.js HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/js/jszip.min.js HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/js/dataTables.buttons.min.js HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/js/buttons.bootstrap5.min.js HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /auth/admin HTTP/1.1" 404 Not Found
+INFO:     213.249.224.235:0 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /auth/admin/error_logs?start_date=2025-05-18&end_date=2025-05-25&level= HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/img/favicon.png HTTP/1.1" 304 Not Modified
+INFO:     213.249.224.235:0 - "GET /static/img/favicon.png HTTP/1.1" 304 Not Modified
+2025-05-25 05:23:04,784 - frontend.routes - WARNING - TEST: Warning level log from /test-error-logging route
+2025-05-25 05:23:04,786 - frontend.routes - ERROR - TEST: Error level log from /test-error-logging route
+2025-05-25 05:23:04,787 - frontend.routes - CRITICAL - TEST: Critical level log from /test-error-logging route
+2025-05-25 05:23:04,789 - app - WARNING - TEST: Flask app warning from test route
+2025-05-25 05:23:04,792 - app - ERROR - TEST: Flask app error from test route
+2025-05-25 05:23:04,793 - frontend.routes - ERROR - TEST: Exception caught in test route
+Traceback (most recent call last):
+  File "/opt/dockerbuilds/domain-logons/frontend/routes.py", line 42, in test_error_logging
+    raise ValueError("TEST: Intentional exception for database logging verification")
+ValueError: TEST: Intentional exception for database logging verification
+2025-05-25 05:23:04,795 - app - ERROR - TEST: Flask app exception in test route
+Traceback (most recent call last):
+  File "/opt/dockerbuilds/domain-logons/frontend/routes.py", line 42, in test_error_logging
+    raise ValueError("TEST: Intentional exception for database logging verification")
+ValueError: TEST: Intentional exception for database logging verification
+INFO:     127.0.0.1:60580 - "GET /test-error-logging HTTP/1.1" 200 OK
+2025-05-25 05:24:41,331 - frontend.routes - WARNING - TEST: Warning level log from /test-error-logging route
+2025-05-25 05:24:41,335 - frontend.routes - ERROR - TEST: Error level log from /test-error-logging route
+2025-05-25 05:24:41,336 - frontend.routes - CRITICAL - TEST: Critical level log from /test-error-logging route
+2025-05-25 05:24:41,338 - app - WARNING - TEST: Flask app warning from test route
+2025-05-25 05:24:41,339 - app - ERROR - TEST: Flask app error from test route
+2025-05-25 05:24:41,343 - frontend.routes - ERROR - TEST: Exception caught in test route
+Traceback (most recent call last):
+  File "/opt/dockerbuilds/domain-logons/frontend/routes.py", line 42, in test_error_logging
+    raise ValueError("TEST: Intentional exception for database logging verification")
+ValueError: TEST: Intentional exception for database logging verification
+2025-05-25 05:24:41,345 - app - ERROR - TEST: Flask app exception in test route
+Traceback (most recent call last):
+  File "/opt/dockerbuilds/domain-logons/frontend/routes.py", line 42, in test_error_logging
+    raise ValueError("TEST: Intentional exception for database logging verification")
+ValueError: TEST: Intentional exception for database logging verification
+INFO:     127.0.0.1:35888 - "GET /test-error-logging HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35904 - "POST /api/log_event HTTP/1.1" 401 Unauthorized
+INFO:     213.249.224.235:0 - "GET /auth/admin/error_logs?start_date=2025-05-18&end_date=2025-05-25&level= HTTP/1.1" 200 OK
+INFO:     213.249.224.235:0 - "GET /static/img/favicon.png HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:41952 - "GET / HTTP/1.1" 200 OK
+INFO:     Received SIGTERM, exiting.
+INFO:     Terminated child process [7721]
+INFO:     Terminated child process [7722]
+INFO:     Waiting for child process [7721]
+INFO:     Shutting down
+INFO:     Shutting down
+INFO:     Finished server process [7721]
+INFO:     Finished server process [7722]
+INFO:     Waiting for child process [7722]
+INFO:     Stopping parent process [7718]

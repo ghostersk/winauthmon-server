@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+    <div class="container mt-4">
+        <h1>Welcome to Domain Logon Monitoring</h1>
+        {% if current_user.is_authenticated %}
+            <p class="lead">Hello {{ current_user.username }}, welcome back!</p>
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Quick Links:</h5>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">
+                                    <a href="{{ url_for('frontend.dashboard') }}" class="text-decoration-none">View Dashboard</a>
+                                </li>
+                                <li class="list-group-item">
+                                    <a href="{{ url_for('frontend.time_spent_report') }}" class="text-decoration-none">Time Spent Report</a>
+                                </li>
+                                {% if current_user.role == 'Admin' or current_user.role == 'GlobalAdmin' %}
+                                <br></br><h5 class="card-title">Management:</h5>
+                                <li class="list-group-item">
+                                    <a href="{{ url_for('auth.manage_users') }}" class="text-decoration-none">Manage Users</a>
+                                </li>
+                                {% endif %}
+                                {% if current_user.role == 'GlobalAdmin' %}
+                                <li class="list-group-item">
+                                    <a href="{{ url_for('auth.manage_companies') }}" class="text-decoration-none">Manage Companies</a>
+                                </li>
+                                <li class="list-group-item">
+                                    <a href="{{ url_for('auth.admin_settings') }}" class="text-decoration-none">Site Settings</a>
+                                </li>
+                                <li class="list-group-item">
+                                    <a href="{{ url_for('auth.view_error_logs') }}" class="text-decoration-none">View Error Logs</a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <p class="lead">Please login {% if allow_registration %}or register {% endif %}to access the monitoring system.</p>
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <a href="{{ url_for('auth.login') }}" class="btn btn-primary mr-2">Login</a>
+                    {% if allow_registration %}
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-secondary">Register</a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock content %}

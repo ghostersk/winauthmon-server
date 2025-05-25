@@ -1,0 +1,28 @@
+flask
+asgiref
+flask_sqlalchemy
+flask_bcrypt
+flask_jwt_extended
+flask_login
+pyotp
+pytz
+flask_wtf
+email-validator
+qrcode
+flask-compress
+pillow
+
+# serving the application
+uvicorn[standard]
+
+
+# not needed?
+#flask_login
+#flask_bootstrap
+#httpx[http2]
+
+# Production enhancements
+redis  # Optional: for distributed rate limiting
+#psutil  # System monitoring for health checks
+#gunicorn  # Production WSGI server
+#click  # CLI tools (for database backups)

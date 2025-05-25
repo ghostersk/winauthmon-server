@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Profile Settings</h3>
+                </div>
+                <div class="card-body">
+                    <h5>Account Information</h5>
+                    <p><strong>Username:</strong> {{ current_user.username }}</p>
+                    <p><strong>Email:</strong> {{ current_user.email }}</p>
+                    <p><strong>Role:</strong> {{ current_user.role }}</p>
+
+                    <hr>
+
+                    <h5>Two-Factor Authentication</h5>
+                    <p>Status: 
+                        <span class="badge {% if current_user.mfa_enabled %}bg-success{% else %}bg-warning{% endif %}">
+                            {{ "Enabled" if current_user.mfa_enabled else "Disabled" }}
+                        </span>
+                        {% if current_user.is_mfa_required() %}
+                        <span class="badge bg-info ms-2">Required</span>
+                        {% endif %}
+                    </p>
+
+                    <div class="btn-group" role="group">
+                        {% if not current_user.mfa_enabled %}
+                            <a href="{{ url_for('auth.setup_mfa') }}" class="btn btn-primary">Setup 2FA</a>
+                        {% endif %}
+                        
+                        {% if current_user.mfa_secret %}
+                            {% if current_user.mfa_enabled and current_user.is_mfa_required() and current_user.role != 'GlobalAdmin' %}
+                                <!-- User cannot disable MFA when it's required, unless they're GlobalAdmin -->
+                                <button type="button" class="btn btn-warning" disabled 
+                                        title="MFA is required and cannot be disabled. Contact your administrator.">
+                                    Disable 2FA (Required)
+                                </button>
+                            {% else %}
+                                <!-- User can toggle MFA -->
+                                <form method="POST" action="{{ url_for('auth.toggle_mfa') }}" style="display: inline;">
+                                    {{ mfa_action_form.hidden_tag() }}
+                                    <button type="submit" class="btn btn-warning">
+                                        {{ "Disable" if current_user.mfa_enabled else "Enable" }} 2FA
+                                    </button>
+                                </form>
+                            {% endif %}
+                            
+                            <form method="POST" action="{{ url_for('auth.reset_mfa') }}" style="display: inline;"
+                                  onsubmit="return confirm('Are you sure you want to reset 2FA? You will need to set it up again.');">
+                                {{ mfa_action_form.hidden_tag() }}
+                                <button type="submit" class="btn btn-danger">Reset 2FA</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                    
+                    {% if current_user.is_mfa_required() and current_user.role != 'GlobalAdmin' %}
+                    <div class="alert alert-info mt-3">
+                        <small><strong>Note:</strong> MFA is required for your account and cannot be disabled. Contact your administrator if you need to disable MFA.</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

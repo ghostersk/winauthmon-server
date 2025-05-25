@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Download Agent - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Download Agent for {{ company.name }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-info-circle"></i> 
+                        Configure and download the Windows monitoring agent with your company's API key pre-configured.
+                    </div>
+                    
+                    <div class="card mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">Agent Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('auth.download_agent', company_id=company.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <div class="mb-3">
+                                    <label for="api_key" class="form-label">Select API Key</label>
+                                    <select class="form-select" id="api_key" name="api_key" required>
+                                        <option value="">Select API Key</option>
+                                        {% for api_key in api_keys %}
+                                        <option value="{{ api_key.id }}">
+                                            {{ api_key.key[:8] }}...{{ api_key.key[-8:] }} 
+                                            {% if api_key.description %}({{ api_key.description }}){% endif %}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                    {% if not api_keys %}
+                                    <div class="form-text text-warning">
+                                        No API keys found. <a href="{{ url_for('auth.company_api_keys', company_id=company.id) }}">Create an API key</a> first.
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="server_url" class="form-label">Server URL</label>
+                                    <input type="url" class="form-control" id="server_url" name="server_url" value="{{ default_url }}" required>
+                                    <div class="form-text">
+                                        The URL where the agent will send login events. Usually the same URL as this website.
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="install_dir" class="form-label">Installation Directory (Optional)</label>
+                                    <input type="text" class="form-control" id="install_dir" name="install_dir" placeholder="C:\ProgramData\UserSessionMon">
+                                    <div class="form-text">
+                                        Custom installation directory for the agent. Leave empty to use the default path.
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary" {% if not api_keys %}disabled{% endif %}>
+                                    <i class="fas fa-download"></i> Download Agent
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">Installation Instructions</h5>
+                        </div>
+                        <div class="card-body">
+                            <ol>
+                                <li>Download the agent package using the form above.</li>
+                                <li>Extract the ZIP file to a folder on your Windows computer.</li>
+                                <li>Run the agent as administrator to install it:
+                                    <code>winagentUSM.exe --service install</code>
+                                </li>
+                                <li>The service will start automatically and begin monitoring login events.</li>
+                                <li>Events will be sent to this server using the specified API key.</li>
+                            </ol>
+                            <p><strong>Note:</strong> The agent requires administrator privileges to install and run as a Windows service.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
