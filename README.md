@@ -2,12 +2,14 @@
 
 ## **Overview**
 A login monitoring system built with Flask that tracks user authentication events across Windows domains. Features multi-tenancy support.
+Windows monitoring agent:
+https://github.com/ghostersk/winauthmon-agent
 
 ## **Architecture**
 
 ### **Core Components**
 ```
-domain-logons/
+winauthmon-agent/
 ├── app.py                    # Main Flask application with Uvicorn ASGI server
 ├── extensions.py             # Flask extensions and configuration
 ├── config.ini               # Configuration file with multiple database support
@@ -44,7 +46,7 @@ domain-logons/
 
 ├── windows_agent/          # Windows Client
 │   └── winagentUSM.exe    # Compiled Windows monitoring agent
-
+         (compiled or downloaded from: https://github.com/ghostersk/winauthmon-agent)                            
 └── instance/              # Instance-specific files
     ├── database.db        # SQLite database (default)
     └── certs/            # SSL certificates
