@@ -1,5 +1,6 @@
-# Domain Login Monitoring System - Application Information
-
+# User Login Monitoring System - Application Information
+  - for Windows
+  - created with AI
 ## **Overview**
 A login monitoring system built with Flask that tracks user authentication events across Windows domains. Features multi-tenancy support.
 Windows monitoring agent:

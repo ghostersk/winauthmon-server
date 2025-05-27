@@ -1,6 +1,7 @@
 from flask import Flask, session, request, send_from_directory, render_template
 from asgiref.wsgi import WsgiToAsgi
 from extensions import db, bcrypt, login_manager, get_env_var
+from flask_migrate import Migrate
 from auth.models import User, Settings, ApiKey
 import ssl
 import logging
@@ -36,6 +37,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Add Migrate after app initialization
+migrate = Migrate(app, db)
 
 # Configure WSGI middleware for reverse proxy support (Traefik)
 proxy_count = config.getint('proxy', 'PROXY_COUNT', fallback=1)
@@ -237,8 +241,7 @@ def init_app():
             # Create initial API key for admin
             api_key = ApiKey(
                 key=ApiKey.generate_key(),
-                description="Initial Admin API Key",
-                user_id=admin.id
+                description="Initial Admin API Key"
             )
             db.session.add(api_key)
         

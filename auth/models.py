@@ -56,7 +56,6 @@ class User(db.Model, UserMixin):
     mfa_secret = db.Column(db.String(32))
     mfa_enabled = db.Column(db.Boolean, default=False)
     mfa_required = db.Column(db.Boolean, default=None)  # None=inherit from global, True=required, False=not required
-    api_keys = db.relationship('ApiKey', backref='user', lazy=True)
     # User-company relationship
     companies = db.relationship('UserCompany', back_populates='user')
 
@@ -119,7 +118,6 @@ class ApiKey(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     last_used = db.Column(db.DateTime)
     is_active = db.Column(db.Boolean, default=True)  # New field to control API key status
-    user_id = db.Column(db.Integer, db.ForeignKey('app_auth_users.id'), nullable=False)
     company_id = db.Column(db.Integer, db.ForeignKey('app_auth_companies.id'), nullable=True)
 
     @staticmethod

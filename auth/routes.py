@@ -1354,7 +1354,6 @@ def create_company_api_key(company_id):
     api_key = ApiKey(
         key=ApiKey.generate_key(),
         description=description,
-        user_id=current_user.id,
         company_id=company_id
     )
     db.session.add(api_key)

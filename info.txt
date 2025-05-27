@@ -1,0 +1,5 @@
+# Migration - remove user_id from ApiKey:
+pip install Flask-Migrate
+python -m flask db init
+python -m flask db migrate -m "Remove user_id from ApiKey"
+python -m flask db upgrade
