@@ -1064,7 +1064,6 @@ def create_company():
         default_api_key = ApiKey(
             key=ApiKey.generate_key(),
             description="HO",  # Changed from "Default Site" to "HO"
-            user_id=current_user.id,
             company_id=company.id,
             is_active=True
         )
@@ -1719,7 +1718,6 @@ def create_company_from_manage_users():
     default_api_key = ApiKey(
         key=ApiKey.generate_key(),
         description="HO",  # Use "HO" instead of "Default Site"
-        user_id=current_user.id,
         company_id=company.id,
         is_active=True
     )
