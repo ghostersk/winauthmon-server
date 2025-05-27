@@ -6,8 +6,9 @@ from .models import User, Settings, AllowedDomain
 from extensions import db
 import re
 
-def validate_password_strength(password):
+def validate_password_strength(form, field):
     """Validate password based on current settings"""
+    password = field.data
     settings = Settings.query.first()
     if not settings:
         return  # No settings found, allow any password

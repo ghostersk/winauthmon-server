@@ -15,6 +15,26 @@
 
                     <hr>
 
+                    <h5>Change Password</h5>
+                    <form method="POST" action="{{ url_for('auth.change_password') }}">
+                        {{ change_password_form.hidden_tag() }}
+                        <div class="mb-3">
+                            {{ change_password_form.current_password.label(class="form-label") }}
+                            {{ change_password_form.current_password(class="form-control") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ change_password_form.new_password.label(class="form-label") }}
+                            {{ change_password_form.new_password(class="form-control") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ change_password_form.confirm_password.label(class="form-label") }}
+                            {{ change_password_form.confirm_password(class="form-control") }}
+                        </div>
+                        {{ change_password_form.submit(class="btn btn-primary mb-3") }}
+                    </form>
+
+                    <hr>
+
                     <h5>Two-Factor Authentication</h5>
                     <p>Status: 
                         <span class="badge {% if current_user.mfa_enabled %}bg-success{% else %}bg-warning{% endif %}">

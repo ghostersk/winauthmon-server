@@ -21,7 +21,7 @@
             <form method="POST" action="{{ url_for('auth.create_company_api_key', company_id=company.id) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="mb-3">
-                    <label for="description" class="form-label">Description</label>
+                    <label for="description" class="form-label">Site Name</label>
                     <input type="text" class="form-control" id="description" name="description" required>
                 </div>
                 <button type="submit" class="btn btn-primary">Generate New Key</button>
@@ -41,7 +41,7 @@
                 <table class="table table-striped" id="apiKeysTable">
                     <thead>
                         <tr>
-                            <th>Description</th>
+                            <th>Site Name</th>
                             <th>Key</th>
                             <th>Created</th>
                             <th>Last Used</th>

@@ -1934,3 +1934,54 @@ def clear_error_logs():
             'message': f'Deleted {deleted_count} error logs older than {days_to_keep} days',
             'deleted_count': deleted_count
         })
+
+@auth.route('/change_password', methods=['POST'])
+@login_required
+def change_password():
+    try:
+        form = ChangePasswordForm()
+        if form.validate_on_submit():
+            # Check if current password is correct
+            if not bcrypt.check_password_hash(current_user.password, form.current_password.data):
+                flash('Current password is incorrect.', 'danger')
+                return redirect(url_for('auth.profile'))
+
+            # Set new password
+            hashed_password = bcrypt.generate_password_hash(form.new_password.data).decode('utf-8')
+            current_user.password = hashed_password
+            db.session.commit()
+
+            # Log password change
+            logger.info(
+                "User changed their password: %s (ID: %s) from IP %s",
+                current_user.username,
+                current_user.id,
+                request.remote_addr,
+                extra={
+                    'ip_address': request.remote_addr,
+                    'user_agent': request.headers.get('User-Agent'),
+                    'user_id': current_user.id,
+                    'username': current_user.username,
+                    'action': 'password_change'
+                }
+            )
+
+            flash('Your password has been updated!', 'success')
+            return redirect(url_for('auth.profile'))
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    flash(f'{error}', 'danger')
+            return redirect(url_for('auth.profile'))
+
+    except Exception as e:
+        logger.exception("Error in change_password function", extra={
+            'ip_address': request.remote_addr,
+            'user_agent': request.headers.get('User-Agent'),
+            'user_id': current_user.id if current_user.is_authenticated else None,
+            'username': current_user.username if current_user.is_authenticated else None,
+            'error': str(e)
+        })
+
+        flash('An error occurred while changing your password. Please try again.', 'danger')
+        return redirect(url_for('auth.profile'))

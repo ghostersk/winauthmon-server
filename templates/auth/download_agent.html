@@ -28,9 +28,8 @@
                                     <select class="form-select" id="api_key" name="api_key" required>
                                         <option value="">Select API Key</option>
                                         {% for api_key in api_keys %}
-                                        <option value="{{ api_key.id }}">
-                                            {{ api_key.key[:8] }}...{{ api_key.key[-8:] }} 
-                                            {% if api_key.description %}({{ api_key.description }}){% endif %}
+                                        <option value="{{ api_key.id }}">                                             
+                                            {{ api_key.description }} - {{ api_key.key[:8] }}...{{ api_key.key[-8:] }}
                                         </option>
                                         {% endfor %}
                                     </select>
