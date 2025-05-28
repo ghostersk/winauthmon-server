@@ -1,0 +1,26 @@
+[Unit]
+Description=WinAuthMon Python Web Service
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=appuser
+Group=appuser
+WorkingDirectory=/opt/winauthmon-server
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/winauthmon-server/.venv/bin/python app.py --gunicorn
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/winauthmon-server
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

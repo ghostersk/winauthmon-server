@@ -1,6 +1,7 @@
 from flask import Flask, session, request, send_from_directory, render_template
 from extensions import db, bcrypt, login_manager, get_env_var
 from flask_wtf import CSRFProtect
+from flask_migrate import Migrate
 from auth import auth_bp
 from api import api_bp
 from frontend import frontend_bp
@@ -250,6 +251,9 @@ db.init_app(app)
 bcrypt.init_app(app)
 login_manager.init_app(app)
 
+# Initialize Flask-Migrate
+migrate = Migrate(app, db)
+
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(api_bp, url_prefix='/api')
@@ -418,28 +422,41 @@ def run_with_gunicorn():
     """Run the application with Gunicorn (Linux/macOS production server)"""
     try:
         import subprocess
+        import sys
         
-        # Read configuration
+        # Read configuration from existing config.ini
         host = config.get('server', 'HOST', fallback='0.0.0.0')
         port = config.getint('server', 'PORT', fallback=8000)
-        workers = config.get('server', 'WORKERS', fallback='4')
+        workers = config.getint('server', 'WORKERS', fallback=4)
+        timeout = config.getint('server', 'TIMEOUT', fallback=30)
+        max_requests = config.getint('server', 'MAX_REQUESTS', fallback=1000)
+        max_requests_jitter = config.getint('server', 'MAX_REQUESTS_JITTER', fallback=100)
         ssl_certfile = config.get('server', 'SSL_CERTFILE', fallback=None)
         ssl_keyfile = config.get('server', 'SSL_KEYFILE', fallback=None)
+        log_level = config.get('logging', 'LEVEL', fallback='info').lower()
         
         logger.info(f"Starting Gunicorn server on {host}:{port} with {workers} workers")
         logger.info(f"SSL: {'Enabled' if ssl_certfile and ssl_keyfile else 'Disabled'}")
         
-        # Build Gunicorn command
+        # Create logs directory
+        log_dir = os.path.join(os.path.dirname(__file__), 'logs')
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # Build Gunicorn command with all settings from config.ini
         cmd = [
-            'gunicorn',
+            sys.executable, '-m', 'gunicorn',  # Use current Python interpreter
             '--bind', f'{host}:{port}',
             '--workers', str(workers),
             '--worker-class', 'sync',
-            '--timeout', '120',
-            '--keepalive', '5',
-            '--max-requests', '1000',
-            '--max-requests-jitter', '50',
+            '--timeout', str(timeout),
+            '--keep-alive', '5',
+            '--max-requests', str(max_requests),
+            '--max-requests-jitter', str(max_requests_jitter),
             '--preload',
+            '--access-logfile', os.path.join(log_dir, 'gunicorn_access.log'),
+            '--error-logfile', os.path.join(log_dir, 'gunicorn_error.log'),
+            '--log-level', log_level,
+            '--pid', os.path.join(os.path.dirname(__file__), 'gunicorn.pid'),
             'app:app'
         ]
         
@@ -449,6 +466,8 @@ def run_with_gunicorn():
             logger.info("SSL enabled with certificates")
         elif ssl_certfile and ssl_keyfile:
             logger.warning(f"SSL certificates not found: {ssl_certfile}, {ssl_keyfile}")
+        
+        logger.info(f"Starting gunicorn with command: {' '.join(cmd)}")
         
         # Run Gunicorn
         subprocess.run(cmd)
