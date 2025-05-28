@@ -6,12 +6,11 @@ from .models import User, Settings, AllowedDomain
 from extensions import db
 import re
 
-def validate_password_strength(form, field):
-    """Validate password based on current settings"""
-    password = field.data
+def validate_password_requirements(password):
+    """Standalone password validation function that returns a list of error messages"""
     settings = Settings.query.first()
     if not settings:
-        return  # No settings found, allow any password
+        return []  # No settings found, allow any password
     
     errors = []
     
@@ -33,6 +32,13 @@ def validate_password_strength(form, field):
         safe_chars = settings.password_safe_special_chars or '!@#$%^&*()_+-=[]{}|;:,.<>?'
         if not any(char in safe_chars for char in password):
             errors.append(f'Password must contain at least one special character from: {safe_chars}')
+    
+    return errors
+
+def validate_password_strength(form, field):
+    """WTForms validator that uses the standalone validation function"""
+    password = field.data
+    errors = validate_password_requirements(password)
     
     if errors:
         raise ValidationError(' '.join(errors))

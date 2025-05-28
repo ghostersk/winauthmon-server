@@ -3,3 +3,4 @@ database.db
 __pycache__/
 *.db
 *.db.old
+config.ini

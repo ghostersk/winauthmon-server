@@ -4,7 +4,6 @@
     <link href="{{ url_for('static', filename='css/dataTables.bootstrap5.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/buttons.bootstrap5.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/buttons.dataTables.min.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/colVis.dataTables.min.css') }}" rel="stylesheet">
     <!-- DateRangePicker CSS -->
     <link href="{{ url_for('static', filename='css/daterangepicker.css') }}" rel="stylesheet">
     <!-- Custom DateRangePicker dark theme styles -->
@@ -216,7 +215,8 @@
                             {% endif %}
                             <th>Site</th>
                             <th>Computer Name</th>
-                            <th>IP Address</th>
+                            <th>Local IP</th>
+                            <th>Public IP</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -228,11 +228,12 @@
                             <td>{{ log.event_type }}</td>
                             <td>{{ log.user_name }}</td>
                             {% if current_user.is_global_admin() and not selected_company_id %}
-                                <td>{{ log.company.name if log.company else 'N/A' }}</td>
+                                <td>{{ log.company.name if log.company else '' }}</td>
                             {% endif %}
-                            <td>{{ log.api_key.description if log.api_key else 'N/A' }}</td>
+                            <td>{{ log.api_key.description if log.api_key else '' }}</td>
                             <td>{{ log.computer_name }}</td>
-                            <td>{{ log.ip_address }}</td>
+                            <td>{{ log.local_ip or '' }}</td>
+                            <td>{{ log.public_ip or '' }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -316,7 +317,7 @@
                      '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
                 columnDefs: [
                     {
-                        targets: [5, 6], // Computer Name and IP Address columns are now at indices 5 and 6
+                        targets: [5, 6, 7], // Computer Name, Local IP, and Public IP columns are now at indices 5, 6, and 7
                         visible: false, // Hide by default
                         searchable: true // Still allow searching in these columns
                     }
@@ -363,15 +364,11 @@
             });
             
             // Column names for the visibility controls
-            var columnNames = [
-                'Timestamp',
-                'Event Type',
-                'User Name',
-                {% if current_user.is_global_admin() and not selected_company_id %}'Company',{% endif %}
-                'Site',
-                'Computer Name',
-                'IP Address'
-            ];
+            var columnNames = ['Timestamp', 'Event Type', 'User Name'];
+            {% if current_user.is_global_admin() and not selected_company_id %}
+            columnNames.push('Company');
+            {% endif %}
+            columnNames.push('Site', 'Computer Name', 'Local IP', 'Public IP');
             
             // Load saved column visibility from localStorage
             function loadColumnVisibility() {
@@ -383,10 +380,10 @@
                         console.log('Error parsing saved column visibility:', e);
                     }
                 }
-                // Default visibility - hide Computer Name (5) and IP Address (6)
+                // Default visibility - hide Computer Name (5), Local IP (6), and Public IP (7)
                 var defaultVisibility = {};
                 columnNames.forEach(function(name, index) {
-                    defaultVisibility[index] = index !== 5 && index !== 6;
+                    defaultVisibility[index] = index !== 5 && index !== 6 && index !== 7;
                 });
                 return defaultVisibility;
             }

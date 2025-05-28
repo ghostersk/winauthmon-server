@@ -1,5 +1,4 @@
 flask
-asgiref
 flask_sqlalchemy
 flask_bcrypt
 flask_jwt_extended
@@ -13,16 +12,7 @@ flask-compress
 pillow
 
 # serving the application
-uvicorn[standard]
-
-
-# not needed?
-#flask_login
-#flask_bootstrap
-#httpx[http2]
-
-# Production enhancements
-redis  # Optional: for distributed rate limiting
+waitress  # Production WSGI server for Windows (better than Gunicorn for Windows)
+gunicorn  # Production WSGI server (Linux/Unix only - won't work on Windows)
 #psutil  # System monitoring for health checks
-#gunicorn  # Production WSGI server
 #click  # CLI tools (for database backups)

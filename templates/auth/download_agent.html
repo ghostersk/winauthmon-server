@@ -23,42 +23,143 @@
                         <div class="card-body">
                             <form method="POST" action="{{ url_for('auth.download_agent', company_id=company.id) }}">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <div class="mb-3">
-                                    <label for="api_key" class="form-label">Select API Key</label>
-                                    <select class="form-select" id="api_key" name="api_key" required>
-                                        <option value="">Select API Key</option>
-                                        {% for api_key in api_keys %}
-                                        <option value="{{ api_key.id }}">                                             
-                                            {{ api_key.description }} - {{ api_key.key[:8] }}...{{ api_key.key[-8:] }}
-                                        </option>
-                                        {% endfor %}
-                                    </select>
-                                    {% if not api_keys %}
-                                    <div class="form-text text-warning">
-                                        No API keys found. <a href="{{ url_for('auth.company_api_keys', company_id=company.id) }}">Create an API key</a> first.
-                                    </div>
-                                    {% endif %}
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-bordered">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 25%;">Setting</th>
+                                                <th style="width: 65%;">Value</th>
+                                                <th style="width: 10%;">Info</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- API Settings -->
+                                            <tr class="table-secondary">
+                                                <td colspan="3"><strong>API Settings</strong></td>
+                                            </tr>
+                                            <tr>
+                                                <td><label for="api_key" class="form-label mb-0">API Key (Site)</label></td>
+                                                <td>
+                                                    <select class="form-select" id="api_key" name="api_key" required>
+                                                        <option value="">Select API Key</option>
+                                                        {% for api_key in api_keys %}
+                                                        <option value="{{ api_key.id }}" {% if loop.first %}selected{% endif %}>                                             
+                                                            {{ api_key.description }} - {{ api_key.key[:8] }}...{{ api_key.key[-8:] }}
+                                                        </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    {% if not api_keys %}
+                                                    <div class="form-text text-warning">
+                                                        No API keys found. <a href="{{ url_for('auth.company_api_keys', company_id=company.id) }}">Create an API key</a> first.
+                                                    </div>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-center">
+                                                    <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="The API key used to authenticate with the server. Each site should have its own unique API key."></i>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><label for="server_url" class="form-label mb-0">Server URL</label></td>
+                                                <td>
+                                                    <input type="url" class="form-control" id="server_url" name="server_url" value="{{ default_url }}" required>
+                                                </td>
+                                                <td class="text-center">
+                                                    <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="The base URL where the agent will send login events and health checks. This should be the URL of this server."></i>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><label for="debug_logs" class="form-label mb-0">Debug Logs</label></td>
+                                                <td>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" id="debug_logs" name="debug_logs" value="true">
+                                                        <label class="form-check-label" for="debug_logs">Enable debug logging</label>
+                                                    </div>
+                                                </td>
+                                                <td class="text-center">
+                                                    <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Enable detailed debug logging for troubleshooting. Should be disabled in production for better performance."></i>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><label for="install_dir" class="form-label mb-0">Installation Directory</label></td>
+                                                <td>
+                                                    <input type="text" class="form-control" id="install_dir" name="install_dir" placeholder="C:\ProgramData\UserSessionMon">
+                                                </td>
+                                                <td class="text-center">
+                                                    <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Directory where the agent will be installed and store its configuration and logs. Leave empty to use the default path."></i>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><label for="health_check_interval" class="form-label mb-0">Health Check Interval (seconds)</label></td>
+                                                <td>
+                                                    <input type="number" class="form-control" id="health_check_interval" name="health_check_interval" value="30" min="10" max="3600">
+                                                </td>
+                                                <td class="text-center">
+                                                    <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Interval in seconds between health check requests to the server. Recommended: 30-300 seconds."></i>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><label for="obtain_public_ip" class="form-label mb-0">Obtain Public IP</label></td>
+                                                <td>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" id="obtain_public_ip" name="obtain_public_ip" value="true" checked>
+                                                        <label class="form-check-label" for="obtain_public_ip">Enable public IP detection</label>
+                                                    </div>
+                                                </td>
+                                                <td class="text-center">
+                                                    <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Enable automatic detection of the public IP address for better location tracking and security monitoring."></i>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><label for="public_ip_http_urls" class="form-label mb-0">Public IP HTTP URLs</label></td>
+                                                <td>
+                                                    <input type="text" class="form-control" id="public_ip_http_urls" name="public_ip_http_urls" value="https://ifconfig.me/ip,https://ipv4.icanhazip.com" placeholder="https://ifconfig.me/ip,https://ipv4.icanhazip.com">
+                                                </td>
+                                                <td class="text-center">
+                                                    <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Comma-separated list of HTTP URLs used to detect the public IP address. The agent will try these in order until one responds."></i>
+                                                </td>
+                                            </tr>
+                                            
+                                            <!-- Logging Settings -->
+                                            <tr class="table-secondary">
+                                                <td colspan="3"><strong>Logging Settings (Max size, after witch it will be archived)</strong></td>
+                                            </tr>
+                                            <tr>
+                                                <td><label for="session_log_rotation_size_mb" class="form-label mb-0">Session Log Size (MB)</label></td>
+                                                <td>
+                                                    <input type="number" class="form-control" id="session_log_rotation_size_mb" name="session_log_rotation_size_mb" value="5" min="0" max="100">
+                                                </td>
+                                                <td class="text-center">
+                                                    <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Maximum size in MB for session log files before rotation. Set to 0 to disable session logging."></i>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><label for="error_log_rotation_size_mb" class="form-label mb-0">Error Log Size (MB)</label></td>
+                                                <td>
+                                                    <input type="number" class="form-control" id="error_log_rotation_size_mb" name="error_log_rotation_size_mb" value="5" min="0" max="100">
+                                                </td>
+                                                <td class="text-center">
+                                                    <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Maximum size in MB for error log files before rotation. Set to 0 to disable error logging."></i>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><label for="event_log_rotation_size_mb" class="form-label mb-0">Event Log Size (MB)</label></td>
+                                                <td>
+                                                    <input type="number" class="form-control" id="event_log_rotation_size_mb" name="event_log_rotation_size_mb" value="5" min="0" max="100">
+                                                </td>
+                                                <td class="text-center">
+                                                    <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Maximum size in MB for event log files before rotation. Set to 0 to disable event logging."></i>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                                 
-                                <div class="mb-3">
-                                    <label for="server_url" class="form-label">Server URL</label>
-                                    <input type="url" class="form-control" id="server_url" name="server_url" value="{{ default_url }}" required>
-                                    <div class="form-text">
-                                        The URL where the agent will send login events. Usually the same URL as this website.
-                                    </div>
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-primary btn-lg" {% if not api_keys %}disabled{% endif %}>
+                                        <i class="fas fa-download"></i> Download Agent Package
+                                    </button>
                                 </div>
-                                
-                                <div class="mb-3">
-                                    <label for="install_dir" class="form-label">Installation Directory (Optional)</label>
-                                    <input type="text" class="form-control" id="install_dir" name="install_dir" placeholder="C:\ProgramData\UserSessionMon">
-                                    <div class="form-text">
-                                        Custom installation directory for the agent. Leave empty to use the default path.
-                                    </div>
-                                </div>
-                                
-                                <button type="submit" class="btn btn-primary" {% if not api_keys %}disabled{% endif %}>
-                                    <i class="fas fa-download"></i> Download Agent
-                                </button>
                             </form>
                         </div>
                     </div>
@@ -71,9 +172,7 @@
                             <ol>
                                 <li>Download the agent package using the form above.</li>
                                 <li>Extract the ZIP file to a folder on your Windows computer.</li>
-                                <li>Run the agent as administrator to install it:
-                                    <code>winagentUSM.exe --service install</code>
-                                </li>
+                                <li>Right-click on "install_service.bat" and select "Run as administrator".</li>
                                 <li>The service will start automatically and begin monitoring login events.</li>
                                 <li>Events will be sent to this server using the specified API key.</li>
                             </ol>
@@ -85,4 +184,16 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Initialize Bootstrap tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
 {% endblock %}

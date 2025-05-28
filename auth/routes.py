@@ -17,6 +17,15 @@ import zipfile
 import tempfile
 import configparser
 import logging
+import re
+import pyotp
+import qrcode
+import base64
+import tempfile
+import configparser
+import zipfile
+import os
+import shutil
 from utils.toolbox import get_current_timestamp
 
 print(get_current_timestamp())
@@ -512,18 +521,17 @@ def manage_users():
                 flash('A user with that username or email already exists.', 'danger')
             else:
                 # Validate password strength
-                try:
-                    from .forms import validate_password_strength
-                    validate_password_strength(password)
-                except ValidationError as e:
-                    logger.warning(f'Password validation failed for user creation: {str(e)}', extra={
+                from .forms import validate_password_requirements
+                password_errors = validate_password_requirements(password)
+                if password_errors:
+                    logger.warning(f'Password validation failed for user creation: {"; ".join(password_errors)}', extra={
                         'username': username,
                         'email': email,
                         'role': role,
                         'remote_addr': request.remote_addr,
                         'current_user_id': current_user.id
                     })
-                    flash(f'Password validation failed: {str(e)}', 'danger')
+                    flash(f'Password validation failed: {"; ".join(password_errors)}', 'danger')
                     return redirect(url_for('auth.manage_users'))
                 
                 hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
@@ -947,17 +955,16 @@ def reset_user_password(user_id):
     new_password = request.form.get('new_password')
     if new_password:
         # Validate password strength
-        try:
-            from .forms import validate_password_strength
-            validate_password_strength(new_password)
-        except ValidationError as e:
-            logger.warning(f'Password validation failed for password reset: {str(e)}', extra={
+        from .forms import validate_password_requirements
+        password_errors = validate_password_requirements(new_password)
+        if password_errors:
+            logger.warning(f'Password validation failed for password reset: {"; ".join(password_errors)}', extra={
                 'target_user_id': user_id,
                 'target_username': user.username,
                 'current_user_id': current_user.id,
                 'remote_addr': request.remote_addr
             })
-            flash(f'Password validation failed: {str(e)}', 'danger')
+            flash(f'Password validation failed: {"; ".join(password_errors)}', 'danger')
             return redirect(url_for('auth.manage_users'))
         
         user.password = bcrypt.generate_password_hash(new_password).decode('utf-8')
@@ -1285,11 +1292,10 @@ def create_company_user(company_id):
             return redirect(url_for('auth.create_company_user', company_id=company_id))
         
         # Validate password strength
-        try:
-            from .forms import validate_password_strength
-            validate_password_strength(password)
-        except ValidationError as e:
-            logger.warning(f'Password validation failed for company user creation: {str(e)}', extra={
+        from .forms import validate_password_requirements
+        password_errors = validate_password_requirements(password)
+        if password_errors:
+            logger.warning(f'Password validation failed for company user creation: {"; ".join(password_errors)}', extra={
                 'username': username,
                 'email': email,
                 'company_id': company_id,
@@ -1297,7 +1303,7 @@ def create_company_user(company_id):
                 'current_user_id': current_user.id,
                 'remote_addr': request.remote_addr
             })
-            flash(f'Password validation failed: {str(e)}', 'danger')
+            flash(f'Password validation failed: {"; ".join(password_errors)}', 'danger')
             return redirect(url_for('auth.create_company_user', company_id=company_id))
         
         # Create new user
@@ -1380,62 +1386,82 @@ def delete_company_api_key(company_id, key_id):
 @auth.route('/company/<int:company_id>/download_agent', methods=['GET', 'POST'])
 @login_required
 def download_agent(company_id):
-    # Check if user has access to this company
-    user_company = UserCompany.query.filter_by(user_id=current_user.id, company_id=company_id).first()
-    if not user_company and current_user.role != 'Admin' and current_user.role != 'GlobalAdmin':
-        abort(403)
-    
-    company = Company.query.get_or_404(company_id)
-    api_keys = ApiKey.query.filter_by(company_id=company_id).all()
-    
-    if request.method == 'POST':
-        api_key_id = request.form.get('api_key')
-        server_url = request.form.get('server_url')
-        install_dir = request.form.get('install_dir')
+    try:
+        # Check if user has access to this company
+        user_company = UserCompany.query.filter_by(user_id=current_user.id, company_id=company_id).first()
+        if not user_company and current_user.role != 'Admin' and current_user.role != 'GlobalAdmin':
+            abort(403)
         
-        # Get the selected API key
-        selected_api_key = ApiKey.query.get(api_key_id)
-        if not selected_api_key or selected_api_key.company_id != company_id:
-            flash('Invalid API key selected', 'danger')
-            return redirect(url_for('auth.download_agent', company_id=company_id))
+        company = Company.query.get_or_404(company_id)
+        api_keys = ApiKey.query.filter_by(company_id=company_id).all()
         
-        # Create a ZIP file with pre-configured agent
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            # Create config.ini file
-            from flask import current_app
+        # Get timezone from the application configuration
+        from flask import current_app
+        app_timezone = current_app.config.get('TIMEZONE', 'UTC')
+        
+        if request.method == 'POST':
+            api_key_id = request.form.get('api_key')
+            server_url = request.form.get('server_url')
             
-            # Get timezone from the application configuration
-            app_timezone = current_app.config.get('TIMEZONE', 'UTC')
+            # Get all form values for configuration
+            debug_logs = 'debug_logs' in request.form
+            install_dir = request.form.get('install_dir', '').strip()
+            if not install_dir:  # If empty or whitespace only, use default
+                install_dir = r"C:\ProgramData\UserSessionMon"
+            health_check_interval = request.form.get('health_check_interval', '30')
+            obtain_public_ip = 'obtain_public_ip' in request.form
+            public_ip_http_urls = request.form.get('public_ip_http_urls', 'https://ifconfig.me/ip,https://ipv4.icanhazip.com')
             
-            config = configparser.ConfigParser()
-            config['API'] = {
-                'api_key': selected_api_key.key,
-                'server_url': server_url,
-                'debug_logs': 'false',
-                'timezone': app_timezone,
-                'install_dir': install_dir if install_dir else r"C:\ProgramData\UserSessionMon"
-            }
-            # Settings for Log retention for agent - it is in MB ( max 20 MB, 0 is No log)
-            config['Logging'] = {
-                'session_log_rotation_size_mb': 5,
-                'error_log_rotation_size_mb': 5,
-                'event_log_rotation_size_mb': 5
-            }
+            # Logging settings
+            session_log_rotation_size_mb = request.form.get('session_log_rotation_size_mb', '5')
+            error_log_rotation_size_mb = request.form.get('error_log_rotation_size_mb', '5')
+            event_log_rotation_size_mb = request.form.get('event_log_rotation_size_mb', '5')
             
-            config_path = os.path.join(tmp_dir, 'config.ini')
-            with open(config_path, 'w') as f:
-                config.write(f)
+            # Get the selected API key
+            selected_api_key = ApiKey.query.get(api_key_id)
+            if not selected_api_key or selected_api_key.company_id != company_id:
+                flash('Invalid API key selected', 'danger')
+                return redirect(url_for('auth.download_agent', company_id=company_id))
+            
+            # Create a ZIP file with pre-configured agent
+            # Create temporary directory and files
+            tmp_dir = tempfile.mkdtemp()
+            try:
+                # Create config.ini file
+                config = configparser.ConfigParser()
+                config['API'] = {
+                    'api_key': selected_api_key.key,
+                    'server_url': server_url,
+                    'debug_logs': str(debug_logs).lower(),
+                    'timezone': app_timezone,
+                    'install_dir': install_dir,
+                    'health_check_interval': health_check_interval,
+                    'health_check_path': '/api/health',
+                    'obtain_public_ip': str(obtain_public_ip).lower(),
+                    'public_ip_http_urls': public_ip_http_urls
+                }
                 
-            # Path to the pre-compiled agent executable
-            agent_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
-                                     'windows_agent', 'winagentUSM.exe')
-            
-            install_dir_display = install_dir if install_dir else r"C:\ProgramData\UserSessionMon"
-            # Create installation batch script
-            install_script_path = os.path.join(tmp_dir, 'install_service.bat')
-            with open(install_script_path, 'w') as f:
-                # Get the current directory for the config path
-                f.write(f"""@echo off
+                # Settings for Log retention for agent - it is in MB ( max 20 MB, 0 is No log)
+                config['Logging'] = {
+                    'session_log_rotation_size_mb': session_log_rotation_size_mb,
+                    'error_log_rotation_size_mb': error_log_rotation_size_mb,
+                    'event_log_rotation_size_mb': event_log_rotation_size_mb
+                }
+                
+                config_path = os.path.join(tmp_dir, 'config.ini')
+                with open(config_path, 'w') as f:
+                    config.write(f)
+                    
+                # Path to the pre-compiled agent executable
+                agent_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
+                                         'windows_agent', 'winagentUSM.exe')
+                
+                install_dir_display = install_dir if install_dir else r"C:\ProgramData\UserSessionMon"
+                # Create installation batch script
+                install_script_path = os.path.join(tmp_dir, 'install_service.bat')
+                with open(install_script_path, 'w') as f:
+                    # Get the current directory for the config path
+                    f.write(f"""@echo off
 REM User Session Monitor Agent Installation Script
 REM This script must be run as Administrator
 
@@ -1485,11 +1511,11 @@ echo To uninstall the app run uninstaller script:
 echo {install_dir_display}\\uninstall.bat
 pause
 """)
-            
-            # Create README file with instructions
-            readme_path = os.path.join(tmp_dir, 'README.txt')
-            with open(readme_path, 'w') as f:
-                f.write(f"""USER SESSION MONITOR AGENT INSTALLATION INSTRUCTIONS
+                
+                # Create README file with instructions
+                readme_path = os.path.join(tmp_dir, 'README.txt')
+                with open(readme_path, 'w') as f:
+                    f.write(f"""USER SESSION MONITOR AGENT INSTALLATION INSTRUCTIONS
 
 AUTOMATIC INSTALLATION (RECOMMENDED):
 1. Extract the contents of this ZIP file to a folder on your Windows computer.
@@ -1512,49 +1538,86 @@ Configuration:
 - Config file will be created at: {install_dir_display}\\config.ini
 
 Service Management:
-- Start service: sc start "User Session Monitor"
-- Stop service: sc stop "User Session Monitor"  
-- Check status: sc query "User Session Monitor"
+- Start service: sc start "UserSessionMonService"
+- Stop service: sc stop "UserSessionMonService"  
+- Check status: sc query "UserSessionMonService"
 - Uninstall service: winagentUSM.exe -service uninstall
 
-If you need to change settings later, edit the config file or use the command line:
-- winagentUSM.exe --api-key <key> 
-- winagentUSM.exe --url <url>
-- winagentUSM.exe --debug true|false
-- winagentUSM.exe --timezone <timezone>
+Configuration Settings:
+- Debug Logs: {str(debug_logs).lower()}
+- Health Check Interval: {health_check_interval} seconds
+- Health Check Path: /api/health
+- Public IP Detection: {str(obtain_public_ip).lower()}
+- Session Log Size: {session_log_rotation_size_mb} MB
+- Error Log Size: {error_log_rotation_size_mb} MB
+- Event Log Size: {event_log_rotation_size_mb} MB
+
+If you need to change settings later, edit the config file at:
+{install_dir_display}\\config.ini
 """)
-            
-            # Create the ZIP file
-            zip_path = os.path.join(tmp_dir, f'{company.name.replace(" ", "_")}_agent.zip')
-            with zipfile.ZipFile(zip_path, 'w') as zip_file:
-                # If agent executable exists, add it
-                if os.path.exists(agent_path):
-                    zip_file.write(agent_path, arcname='winagentUSM.exe')
-                else:
-                    flash('Pre-compiled agent not found. Please contact administrator.', 'danger')
-                    return redirect(url_for('auth.download_agent', company_id=company_id))
                 
-                zip_file.write(config_path, arcname='config.ini')
-                zip_file.write(readme_path, arcname='README.txt')
-                zip_file.write(install_script_path, arcname='install_service.bat')
-            
-            # Send the ZIP file to the user
-            return send_file(
-                zip_path,
-                as_attachment=True,
-                download_name=f'{company.name.replace(" ", "_")}_agent.zip',
-                mimetype='application/zip'
-            )
-    
-    # Default server URL is the current request URL's base
-    default_url = request.url_root.rstrip('/')
-    
-    return render_template(
-        'auth/download_agent.html', 
-        company=company, 
-        api_keys=api_keys,
-        default_url=default_url
-    )
+                # Create the ZIP file
+                zip_path = os.path.join(tmp_dir, f'{company.name.replace(" ", "_")}_agent.zip')
+                with zipfile.ZipFile(zip_path, 'w') as zip_file:
+                    # If agent executable exists, add it
+                    if os.path.exists(agent_path):
+                        zip_file.write(agent_path, arcname='winagentUSM.exe')
+                    else:
+                        flash('Pre-compiled agent not found. Please contact administrator.', 'danger')
+                        return redirect(url_for('auth.download_agent', company_id=company_id))
+                    
+                    zip_file.write(config_path, arcname='config.ini')
+                    zip_file.write(readme_path, arcname='README.txt')
+                    zip_file.write(install_script_path, arcname='install_service.bat')
+                
+                # Read the ZIP file contents into memory
+                with open(zip_path, 'rb') as f:
+                    zip_data = f.read()
+                
+                # Create a BytesIO object to serve the file
+                from io import BytesIO
+                zip_buffer = BytesIO(zip_data)
+                zip_buffer.seek(0)
+                
+                # Clean up temporary directory now that we have the data in memory
+                import shutil
+                try:
+                    shutil.rmtree(tmp_dir)
+                except Exception as cleanup_error:
+                    # Log cleanup error but don't fail the download
+                    logger.warning(f"Failed to cleanup temporary directory {tmp_dir}: {str(cleanup_error)}")
+                
+                # Send the ZIP file to the user from memory
+                return send_file(
+                    zip_buffer,
+                    as_attachment=True,
+                    download_name=f'{company.name.replace(" ", "_")}_agent.zip',
+                    mimetype='application/zip'
+                )
+            except Exception as e:
+                # Clean up temporary directory if an error occurs
+                import shutil
+                try:
+                    shutil.rmtree(tmp_dir)
+                except Exception:
+                    pass  # Ignore cleanup errors during exception handling
+                raise e
+        
+        # Default server URL is the current request URL's base
+        default_url = f"https://{request.host}"
+        
+        return render_template(
+            'auth/download_agent.html', 
+            company=company, 
+            api_keys=api_keys,
+            default_url=default_url,
+            app_timezone=app_timezone
+        )
+        
+    except Exception as e:
+        logging.error(f"Error in download_agent for company {company_id}: {str(e)}", exc_info=True)
+        flash('An error occurred while preparing the agent download. Please try again.', 'danger')
+        return redirect(url_for('auth.company_api_keys', company_id=company_id))
 
 # User-Company Management Routes for manage_users page
 @auth.route('/admin/user/<int:user_id>/companies/add', methods=['POST'])

@@ -21,7 +21,8 @@ class Log(db.Model):
     event_type = db.Column(db.String(20), nullable=False)
     user_name = db.Column(db.String(50), nullable=False)
     computer_name = db.Column(db.String(50), nullable=False)
-    ip_address = db.Column(db.String(15), nullable=False)
+    local_ip = db.Column(db.String(45), nullable=True)  # Increased size to support IPv6, made nullable
+    public_ip = db.Column(db.String(45), nullable=True)  # New field for public IP, nullable
     timestamp = db.Column(db.DateTime, nullable=False, default=get_current_time_with_timezone)
     retry = db.Column(db.Integer, default=0, nullable=False)
     company_id = db.Column(db.Integer, db.ForeignKey('app_auth_companies.id'), nullable=True)

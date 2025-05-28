@@ -144,7 +144,7 @@ def log_event():
                 Log.event_type == data['EventType'],
                 Log.user_name == data['UserName'],
                 Log.computer_name == data['ComputerName'],
-                Log.ip_address == data['IPAddress'],
+                Log.local_ip == data.get('LocalIP'),
                 Log.timestamp == timestamp
             )
         ).first()
@@ -158,7 +158,8 @@ def log_event():
             event_type=data['EventType'],
             user_name=data['UserName'],
             computer_name=data['ComputerName'],
-            ip_address=data['IPAddress'],
+            local_ip=data.get('LocalIP'),
+            public_ip=data.get('PublicIP'),
             timestamp=timestamp,
             retry=is_retry,
             company_id=g.company_id,  # Add the company ID from the API key
@@ -180,6 +181,8 @@ def log_event():
             'event_type': data.get('EventType') if 'data' in locals() else None,
             'user_name': data.get('UserName') if 'data' in locals() else None,
             'computer_name': data.get('ComputerName') if 'data' in locals() else None,
+            'local_ip': data.get('LocalIP') if 'data' in locals() else None,
+            'public_ip': data.get('PublicIP') if 'data' in locals() else None,
             'retry_attempt': data.get('retry', 0) if 'data' in locals() else None,
             'error': str(e)
         })

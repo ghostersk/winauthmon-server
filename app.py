@@ -1,10 +1,5 @@
 from flask import Flask, session, request, send_from_directory, render_template
-from asgiref.wsgi import WsgiToAsgi
 from extensions import db, bcrypt, login_manager, get_env_var
-from flask_migrate import Migrate
-from auth.models import User, Settings, ApiKey
-import ssl
-import logging
 from flask_wtf import CSRFProtect
 from auth import auth_bp
 from api import api_bp
@@ -13,7 +8,10 @@ from datetime import datetime, timezone, timedelta
 import pytz
 import configparser
 import os
-import uvicorn
+import sys
+import platform
+import ssl
+import logging
 import argparse
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.exceptions import HTTPException
@@ -22,24 +20,43 @@ from flask_compress import Compress
 from utils.security_headers import setup_security_headers
 from utils.rate_limiter import apply_rate_limits
 from utils.db_logging import setup_database_logging
+from auth.models import User, Settings, ApiKey
 # Removed SQLite encryption import
 
-# Load configuration from ini file
-config = configparser.ConfigParser()
-config_file = os.path.join(os.path.dirname(__file__), 'config.ini')
-config.read(config_file)
-
-# Set up logging
+# Set up logging first
 logging.basicConfig(
-    level=logging.DEBUG if config.getboolean('app', 'APP_DEBUG', fallback=True) else logging.INFO,
+    level=logging.INFO,  # Default level, will be updated after config is loaded
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+# Configuration setup with automatic config.ini management
+from utils.config_manager import initialize_config
 
-# Add Migrate after app initialization
-migrate = Migrate(app, db)
+config_file = os.path.join(os.path.dirname(__file__), 'config.ini')
+
+# Initialize configuration with automatic creation/updating
+try:
+    config = initialize_config(config_file, preserve_existing=True)
+    logger.info("Configuration initialized successfully")
+    
+    # Update logging level based on config
+    debug_mode = config.getboolean('app', 'APP_DEBUG', fallback=False)
+    if debug_mode:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.info("Debug mode enabled")
+    
+except Exception as e:
+    logger.error(f"Failed to initialize configuration: {e}")
+    # Fall back to basic ConfigParser if config manager fails
+    config = configparser.ConfigParser()
+    if os.path.exists(config_file):
+        config.read(config_file)
+    else:
+        logger.error(f"Configuration file {config_file} not found and could not be created")
+        exit(1)
+
+app = Flask(__name__)
 
 # Configure WSGI middleware for reverse proxy support (Traefik)
 proxy_count = config.getint('proxy', 'PROXY_COUNT', fallback=1)
@@ -99,11 +116,11 @@ if config.getboolean('cache', 'ENABLE_COMPRESSION', fallback=True):
 # Enable CSRF protection
 csrf = CSRFProtect(app)
 
-# Configure static files with caching
+# Configure static files with caching and proper MIME types
 @app.route('/favicon.ico')
 def favicon():
     response = send_from_directory(os.path.join(app.root_path, 'static', 'img'),
-                               'favicon.ico', mimetype='image/ico')
+                               'favicon.ico', mimetype='image/x-icon')
     
     # Add cache headers manually instead of using cache_timeout
     max_age = config.getint('cache', 'IMAGE_MAX_AGE', fallback=604800)
@@ -111,6 +128,62 @@ def favicon():
     response.headers['Expires'] = (datetime.now(timezone.utc) + timedelta(seconds=max_age)).strftime('%a, %d %b %Y %H:%M:%S GMT')
     
     return response
+
+# Add explicit static file serving with proper MIME types
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    """Serve static files with proper MIME types"""
+    from flask import send_from_directory
+    import mimetypes
+    
+    # Ensure proper MIME type detection
+    if filename.endswith('.css'):
+        mimetype = 'text/css'
+    elif filename.endswith('.js'):
+        mimetype = 'application/javascript'
+    elif filename.endswith('.png'):
+        mimetype = 'image/png'
+    elif filename.endswith('.jpg') or filename.endswith('.jpeg'):
+        mimetype = 'image/jpeg'
+    elif filename.endswith('.gif'):
+        mimetype = 'image/gif'
+    elif filename.endswith('.ico'):
+        mimetype = 'image/x-icon'
+    elif filename.endswith('.woff'):
+        mimetype = 'font/woff'
+    elif filename.endswith('.woff2'):
+        mimetype = 'font/woff2'
+    elif filename.endswith('.ttf'):
+        mimetype = 'font/ttf'
+    else:
+        # Use mimetypes module for other files
+        mimetype, _ = mimetypes.guess_type(filename)
+        if not mimetype:
+            mimetype = 'application/octet-stream'
+    
+    try:
+        response = send_from_directory(app.static_folder, filename, mimetype=mimetype)
+        
+        # Add cache headers based on file type
+        if filename.endswith(('.png', '.jpg', '.jpeg', '.gif', '.ico', '.woff', '.woff2', '.ttf')):
+            max_age = config.getint('cache', 'IMAGE_MAX_AGE', fallback=604800)
+        elif filename.endswith(('.js', '.css')):
+            max_age = config.getint('cache', 'JS_CSS_MAX_AGE', fallback=43200)
+        else:
+            max_age = config.getint('cache', 'STATIC_MAX_AGE', fallback=86400)
+            
+        response.headers['Cache-Control'] = f'public, max-age={max_age}'
+        response.headers['Expires'] = (datetime.now(timezone.utc) + timedelta(seconds=max_age)).strftime('%a, %d %b %Y %H:%M:%S GMT')
+        
+        # Add ETag for efficient caching
+        response.add_etag()
+        
+        return response
+        
+    except FileNotFoundError:
+        # Return 404 for missing static files instead of redirecting to HTML pages
+        from flask import abort
+        abort(404)
 
 # Setup security headers
 setup_security_headers(app, config)
@@ -177,8 +250,6 @@ db.init_app(app)
 bcrypt.init_app(app)
 login_manager.init_app(app)
 
-wsg = WsgiToAsgi(app)
-
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(api_bp, url_prefix='/api')
@@ -190,6 +261,12 @@ apply_rate_limits(app, config)
 def handle_http_exception(exc:HTTPException):
     """Use the code and description from an HTTPException to inform the user of an error"""    
     logger.debug('HTTP error %s - %s', exc.code, exc.description)
+    
+    # For static file 404s, return proper 404 response instead of HTML error page
+    if request.path.startswith('/static/') and exc.code == 404:
+        from flask import Response
+        return Response(f"Static file not found: {request.path}", status=404, mimetype='text/plain')
+    
     return render_template("error.html", status_code=exc.code, description=exc.description)
 
 def handle_uncaught_exception(exc:Exception):
@@ -204,7 +281,7 @@ app.register_error_handler(Exception, handle_uncaught_exception)
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 def init_app():
     with app.app_context():
@@ -241,7 +318,8 @@ def init_app():
             # Create initial API key for admin
             api_key = ApiKey(
                 key=ApiKey.generate_key(),
-                description="Initial Admin API Key"
+                description="Initial Admin API Key",
+                user_id=admin.id
             )
             db.session.add(api_key)
         
@@ -273,96 +351,183 @@ def format_datetime(value):
 with app.app_context():
     csrf.exempt(api_bp)
 
+def get_best_server():
+    """Determine the best server for the current OS"""
+    system = platform.system().lower()
+    
+    if system == 'windows':
+        return 'waitress'
+    elif system in ['linux', 'darwin']:  # Linux or macOS
+        return 'gunicorn'
+    else:
+        logger.warning(f"Unknown OS: {system}, defaulting to waitress")
+        return 'waitress'
+
+def run_with_waitress():
+    """Run the application with Waitress (Windows-compatible production server)"""
+    try:
+        from waitress import serve
+        
+        # Read configuration
+        host = config.get('server', 'HOST', fallback='0.0.0.0')
+        port = config.getint('server', 'PORT', fallback=8000)
+        threads = config.get('server', 'WORKERS', fallback='4')  # Waitress uses threads instead of processes
+        ssl_certfile = config.get('server', 'SSL_CERTFILE', fallback=None)
+        ssl_keyfile = config.get('server', 'SSL_KEYFILE', fallback=None)
+        
+        logger.info(f"Starting Waitress server on {host}:{port} with {threads} threads")
+        
+        # Waitress configuration - optimized for performance  
+        serve_kwargs = {
+            'host': host,
+            'port': port,
+            'threads': int(threads),
+            'connection_limit': 1000,
+            'cleanup_interval': 30,
+            'channel_timeout': 120,
+            'log_socket_errors': True,
+            # Valid Waitress performance optimizations
+            'recv_bytes': 65536,  # Increase receive buffer
+            'send_bytes': 65536,  # Increase send buffer
+            'max_request_header_size': 262144,  # 256KB header limit
+            'max_request_body_size': 1073741824,  # 1GB body limit
+            'expose_tracebacks': False,  # Don't expose tracebacks in production
+        }
+        
+        # Note: Waitress doesn't handle SSL directly - use reverse proxy for SSL
+        if ssl_certfile and ssl_keyfile and os.path.exists(ssl_certfile) and os.path.exists(ssl_keyfile):
+            logger.info("SSL certificates found - but Waitress doesn't handle SSL directly")
+            logger.info("For SSL support, use a reverse proxy (nginx, traefik, etc.)")
+            logger.info("Starting Waitress without SSL on HTTP")
+        else:
+            logger.info("No SSL certificates configured - starting with HTTP")
+        
+        # Start Waitress server (HTTP only - SSL handled by reverse proxy)
+        serve(app, **serve_kwargs)
+        
+    except ImportError:
+        logger.error("Waitress not installed. Install with: pip install waitress")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to start Waitress: {e}")
+        return False
+    
+    return True
+
+def run_with_gunicorn():
+    """Run the application with Gunicorn (Linux/macOS production server)"""
+    try:
+        import subprocess
+        
+        # Read configuration
+        host = config.get('server', 'HOST', fallback='0.0.0.0')
+        port = config.getint('server', 'PORT', fallback=8000)
+        workers = config.get('server', 'WORKERS', fallback='4')
+        ssl_certfile = config.get('server', 'SSL_CERTFILE', fallback=None)
+        ssl_keyfile = config.get('server', 'SSL_KEYFILE', fallback=None)
+        
+        logger.info(f"Starting Gunicorn server on {host}:{port} with {workers} workers")
+        logger.info(f"SSL: {'Enabled' if ssl_certfile and ssl_keyfile else 'Disabled'}")
+        
+        # Build Gunicorn command
+        cmd = [
+            'gunicorn',
+            '--bind', f'{host}:{port}',
+            '--workers', str(workers),
+            '--worker-class', 'sync',
+            '--timeout', '120',
+            '--keepalive', '5',
+            '--max-requests', '1000',
+            '--max-requests-jitter', '50',
+            '--preload',
+            'app:app'
+        ]
+        
+        # Add SSL configuration if available
+        if ssl_certfile and ssl_keyfile and os.path.exists(ssl_certfile) and os.path.exists(ssl_keyfile):
+            cmd.extend(['--certfile', ssl_certfile, '--keyfile', ssl_keyfile])
+            logger.info("SSL enabled with certificates")
+        elif ssl_certfile and ssl_keyfile:
+            logger.warning(f"SSL certificates not found: {ssl_certfile}, {ssl_keyfile}")
+        
+        # Run Gunicorn
+        subprocess.run(cmd)
+        
+    except ImportError:
+        logger.error("Gunicorn not available on this system")
+        return False
+    except FileNotFoundError:
+        logger.error("Gunicorn command not found. Install with: pip install gunicorn")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to start Gunicorn: {e}")
+        return False
+    
+    return True
+
 def run_app():
-    """Start the application with Uvicorn using config settings"""
-    host = config.get('server', 'HOST', fallback='0.0.0.0')
-    port = config.getint('server', 'PORT', fallback=8000)
-    ssl_certfile = config.get('server', 'SSL_CERTFILE', fallback='certs/cert.pem')
-    ssl_keyfile = config.get('server', 'SSL_KEYFILE', fallback='certs/key.pem')
+    """Start the application with the best server for this OS"""
+    best_server = get_best_server()
     
-    # Get new configuration settings
-    development_mode = config.getboolean('server', 'DEVELOPMENT_MODE', fallback=False)
-    watch_files = config.getboolean('server', 'WATCH_FILES', fallback=False)
-    workers_setting = config.get('server', 'WORKERS', fallback='1')
-    worker_lifetime = config.getint('server', 'WORKER_LIFETIME', fallback=86400)
-    graceful_shutdown = config.getboolean('server', 'GRACEFUL_SHUTDOWN', fallback=True)
-    shutdown_timeout = config.getint('server', 'SHUTDOWN_TIMEOUT', fallback=30)
+    logger.info(f"Detected OS: {platform.system()}")
+    logger.info(f"Using server: {best_server}")
     
-    # Parse workers setting - could be "auto" or a number
-    workers = None
-    if workers_setting.lower() == 'auto':
-        import multiprocessing
-        workers = multiprocessing.cpu_count()
+    if best_server == 'waitress':
+        success = run_with_waitress()
+    elif best_server == 'gunicorn':
+        success = run_with_gunicorn()
     else:
-        try:
-            workers = int(workers_setting)
-        except ValueError:
-            logger.warning(f"Invalid WORKERS setting '{workers_setting}', defaulting to 1")
-            workers = 1
+        logger.error("No suitable server found")
+        success = False
     
-    # Only enable file watching in development mode
-    reload_enabled = development_mode and watch_files
-    
-    # Use debug log level in development mode
-    log_level = "debug" if development_mode else "info"
-    
-    logger.info(f"Starting application on {host}:{port} with SSL")
-    logger.info(f"SSL certificate: {ssl_certfile}")
-    logger.info(f"SSL key: {ssl_keyfile}")
-    logger.info(f"Development mode: {development_mode}")
-    logger.info(f"File watching: {reload_enabled}")
-    logger.info(f"Workers: {workers}")
-    
-    # Get max requests per worker before graceful restart
-    # Setting to None disables the worker auto-restart feature
-    limit_max_requests = None
-    if worker_lifetime > 0:
-        # If worker_lifetime is set (> 0), we'll use a reasonable request limit
-        # Default to around 10,000 requests per worker before restart
-        limit_max_requests = 10000
-    
-    # Get trusted proxy configuration for Uvicorn
-    trusted_proxies_config = config.get('proxy', 'TRUSTED_PROXIES', fallback='').strip()
-    if trusted_proxies_config:
-        forwarded_allow_ips = trusted_proxies_config.replace(',', ' ')
-        logger.info(f"Uvicorn forwarded_allow_ips: {forwarded_allow_ips}")
-    else:
-        forwarded_allow_ips = '*'
-        logger.info("Uvicorn allowing all IPs for forwarded headers")
-    
-    uvicorn.run(
-        "app:wsg", 
-        host=host, 
-        port=port, 
-        reload=reload_enabled,
-        workers=workers,
-        log_level=log_level,
-        ssl_certfile=ssl_certfile,
-        ssl_keyfile=ssl_keyfile,
-        proxy_headers=True,
-        forwarded_allow_ips=forwarded_allow_ips,
-        timeout_keep_alive=65,  # Keep-alive timeout to detect hanging connections
-        limit_max_requests=limit_max_requests,  # Fixed: Only restart workers after this many requests
-        timeout_graceful_shutdown=shutdown_timeout
-    )
+    if not success:
+        logger.error("Failed to start preferred server, falling back to Flask dev server")
+        # Fallback to Flask development server
+        host = config.get('server', 'HOST', fallback='0.0.0.0')
+        port = config.getint('server', 'PORT', fallback=8000)
+        ssl_certfile = config.get('server', 'SSL_CERTFILE', fallback='certs/cert.pem')
+        ssl_keyfile = config.get('server', 'SSL_KEYFILE', fallback='certs/key.pem')
+        
+        ssl_context = None
+        if ssl_certfile and ssl_keyfile and os.path.exists(ssl_certfile) and os.path.exists(ssl_keyfile):
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ssl_context.load_cert_chain(ssl_certfile, ssl_keyfile)
+            ssl_context.verify_mode = ssl.CERT_NONE
+        
+        app.run(debug=app.config['APP_DEBUG'], ssl_context=ssl_context, host=host, port=port)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Domain Logons Monitoring Application')
-    parser.add_argument('--legacy', action='store_true', help='Use legacy Flask server instead of Uvicorn')
+    parser.add_argument('--legacy', action='store_true', help='Use legacy Flask development server')
+    parser.add_argument('--waitress', action='store_true', help='Force use of Waitress server (Windows)')
+    parser.add_argument('--gunicorn', action='store_true', help='Force use of Gunicorn server (Linux/macOS)')
     args = parser.parse_args()
     
     if args.legacy:
-        # Legacy Flask server mode
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_certfile = config.get('server', 'SSL_CERTFILE', fallback='certs/cert.pem')
-        ssl_keyfile = config.get('server', 'SSL_KEYFILE', fallback='certs/key.pem')
-        ssl_context.load_cert_chain(ssl_certfile, ssl_keyfile)
-        ssl_context.verify_mode = ssl.CERT_NONE  # Accept self-signed certificates
-        
+        # Legacy Flask development server mode
         host = config.get('server', 'HOST', fallback='0.0.0.0')
         port = config.getint('server', 'PORT', fallback=8000)
+        ssl_certfile = config.get('server', 'SSL_CERTFILE', fallback='certs/cert.pem')
+        ssl_keyfile = config.get('server', 'SSL_KEYFILE', fallback='certs/key.pem')
         
+        ssl_context = None
+        if ssl_certfile and ssl_keyfile and os.path.exists(ssl_certfile) and os.path.exists(ssl_keyfile):
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ssl_context.load_cert_chain(ssl_certfile, ssl_keyfile)
+            ssl_context.verify_mode = ssl.CERT_NONE
+        
+        logger.info("Starting Flask development server")
         app.run(debug=app.config['APP_DEBUG'], ssl_context=ssl_context, host=host, port=port)
+    elif args.waitress:
+        # Force Waitress server
+        logger.info("Force using Waitress server")
+        if not run_with_waitress():
+            logger.error("Failed to start Waitress, no fallback available")
+    elif args.gunicorn:
+        # Force Gunicorn server
+        logger.info("Force using Gunicorn server")
+        if not run_with_gunicorn():
+            logger.error("Failed to start Gunicorn, no fallback available")
     else:
-        # Default to Uvicorn server
+        # Auto-detect best server for OS
         run_app()

@@ -52,7 +52,7 @@ def add_security_headers(response):
     
     # Permissions Policy (formerly Feature-Policy)
     response.headers['Permissions-Policy'] = (
-        'camera=(), microphone=(), geolocation=(), interest-cohort=()'
+        'camera=(), microphone=(), geolocation=(), payment=(), fullscreen=(self)'
     )
     
     return response
