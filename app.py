@@ -41,6 +41,31 @@ try:
     config = initialize_config(config_file, preserve_existing=True)
     logger.info("Configuration initialized successfully")
     
+    # Auto-generate secure secret key if needed
+    from utils.toolbox import ensure_secure_secret_key, ensure_ssl_certificates
+    
+    config_updated = False
+    
+    secret_key_updated = ensure_secure_secret_key(config)
+    if secret_key_updated:
+        config_updated = True
+        logger.info("Generated new secure secret key")
+    
+    # Auto-generate SSL certificates if needed
+    cert_path, key_path, ssl_enabled = ensure_ssl_certificates(config, os.path.dirname(__file__))
+    if ssl_enabled and cert_path and key_path:
+        config_updated = True
+        logger.info("SSL certificates configured")
+    
+    # Save configuration if any updates were made
+    if config_updated:
+        try:
+            with open(config_file, 'w') as f:
+                config.write(f)
+            logger.info("Configuration file updated with new settings")
+        except Exception as e:
+            logger.error(f"Failed to save configuration updates: {e}")
+    
     # Update logging level based on config
     debug_mode = config.getboolean('app', 'APP_DEBUG', fallback=False)
     if debug_mode:

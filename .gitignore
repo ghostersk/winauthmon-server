@@ -3,4 +3,18 @@ database.db
 __pycache__/
 *.db
 *.db.old
+
+# Configuration files (contain secrets)
 config.ini
+config.ini.backup
+*.ini.backup
+cert.pem
+key.pem
+
+# Logs
+*.log
+gunicorn.pid
+
+# OS generated files
+.DS_Store
+Thumbs.db

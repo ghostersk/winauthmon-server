@@ -1,4 +1,5 @@
 #!/bin/bash
+# Create self signed certificates if they do not existst
 openssl req -x509 -newkey rsa:4096 \
     -keyout instance/certs/key.pem \
     -out instance/certs/cert.pem \
