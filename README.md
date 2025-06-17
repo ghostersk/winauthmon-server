@@ -1,12 +1,27 @@
 # User Login Monitoring System - Application Information
-  - for Windows
-  - created with AI
+  - The user login monitoring agent is only for Windows
+  - Web portal allows creating multiple companies and different sites - (api key) what you can devide monitoring users
+  - allows global system management or per company user access
+  - MFA login option included
+  - Possible to allow register user account, if enabled
+  - Limit registration to specific domains
+  - 
+    
 ## **Overview**
 A login monitoring system built with Flask that tracks user authentication events across Windows domains. Features multi-tenancy support.
 Windows monitoring agent:
 https://github.com/ghostersk/winauthmon-agent
 
-## **Architecture**
+## **Website Overview**
+![image](https://github.com/user-attachments/assets/e49dd1d8-0dbe-4c46-93ec-de0b86cd5ff6)
+![image](https://github.com/user-attachments/assets/7666dc97-f936-4fcd-ac22-af7e80ba50e4)
+![image](https://github.com/user-attachments/assets/aa5bdcd0-fb35-4e17-a81f-74f2c19e3249)
+![image](https://github.com/user-attachments/assets/2fb90025-5259-42d2-971c-9f8e864ca8f3)
+![image](https://github.com/user-attachments/assets/7b192870-20a6-417f-a115-8996db9d571f)
+![image](https://github.com/user-attachments/assets/61c6e214-f1ff-45f2-92b0-b21501b338fe)
+![image](https://github.com/user-attachments/assets/ca9c3abf-bb32-4054-a0a6-2911b4fa075f)
+![image](https://github.com/user-attachments/assets/edb4b3d9-075d-455f-abf0-3770daba9638)
+
 
 ### **Core Components**
 ```
@@ -53,44 +68,6 @@ winauthmon-agent/
     └── certs/            # SSL certificates
 ```
 
-## 🔧 **Technology Stack**
-
-### **Backend Framework**
-- **Flask**: Web framework with blueprint architecture
-- **Uvicorn**: ASGI server for production deployment
-- **SQLAlchemy**: ORM with support for SQLite, PostgreSQL, MySQL, MSSQL
-- **Flask-Login**: Session management and authentication
-- **Flask-WTF**: Form handling and CSRF protection
-
-### **Security & Authentication**
-- **Bcrypt**: Password hashing
-- **PyOTP**: Time-based One-Time Password (TOTP) for MFA
-- **JWT**: Optional token-based authentication
-- **CSRF Protection**: Built-in token validation
-- **Security Headers**: CSP, HSTS, X-Frame-Options
-- **Rate Limiting**: IP-based with Redis backend support
-
-### **Frontend**
-- **Bootstrap 5**: Responsive UI framework with dark theme
-- **DataTables**: Advanced table features with export capabilities
-- **Chart.js**: Data visualization for reports
-- **Moment.js**: Date/time handling
-- **DateRangePicker**: Advanced date selection
-
-### **Database Support**
-- **SQLite**: Default (file-based)
-- **PostgreSQL**: Production recommended
-- **MySQL/MariaDB**: Enterprise support
-- **Microsoft SQL Server**: Corporate environments
-
-### **Deployment**
-- **Docker**: Containerization ready
-- **Traefik**: Reverse proxy with SSL termination
-- **systemd**: Linux service integration
-- **SSL/TLS**: Built-in HTTPS support
-
-## **Key Features**
-
 ### **Multi-Tenancy**
 - **Company Isolation**: Complete data separation between organizations
 - **Role-Based Access Control**: GlobalAdmin, Admin, CompanyAdmin, User roles
@@ -118,13 +95,6 @@ winauthmon-agent/
 - **Export Capabilities**: CSV, Excel, PDF export
 - **Date Range Filtering**: Flexible time period selection
 
-### **API Capabilities**
-- **RESTful API**: JSON-based event logging
-- **API Key Authentication**: Secure programmatic access
-- **Health Check Endpoint**: System status monitoring
-- **Timestamp Flexibility**: Multiple format support
-
-
 ### **Core Tables**
 ```sql
 -- Authentication
@@ -138,33 +108,6 @@ app_auth_settings          # Global application settings
 api_logs                   # Login/logout event records
 api_error_logs            # Application error tracking
 ```
-
-### **Key Relationships**
-- Users ↔ Companies (Many-to-Many via UserCompany)
-- Companies → API Keys (One-to-Many)
-- API Keys → Logs (One-to-Many)
-- Users → API Keys (One-to-Many)
-
-### **Authentication Security**
-- Bcrypt password hashing with configurable rounds
-- TOTP-based MFA
-- Session timeout and secure cookie settings
-- CSRF protection on all forms
-- Password strength validation
-
-### **Network Security**
-- HTTPS enforcement with HSTS
-- Security headers (CSP, X-Frame-Options, etc.)
-- Proxy support for Traefik/nginx
-- IP-based rate limiting
-- Trusted proxy configuration
-
-### **Application Security**
-- SQL injection prevention via ORM
-- XSS protection with template escaping
-- Input validation and sanitization
-- Error handling without information disclosure
-
 ### **Dashboard Features**
 - Real-time login event display
 - Advanced filtering and search
@@ -177,9 +120,6 @@ api_error_logs            # Application error tracking
 - Login frequency reports
 - Failed authentication tracking
 - Company-specific analytics
-
-### **System Monitoring**
-- Database connectivity health checks
 
 ## 🛠️ **Configuration**
 
