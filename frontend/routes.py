@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
-from auth.models import User, Company, UserCompany
+from auth.models import User, Company, UserCompany, ApiKey
 from api.models import Log
 from extensions import db
 from datetime import datetime, timedelta
@@ -73,14 +73,21 @@ def dashboard():
             end_date = datetime.now(app_tz) + timedelta(hours=1)  # Include 1 hour in the future
             start_date = end_date - timedelta(hours=49)  # Look back 48 hours from future end time
 
-        # Get company filter if provided
+        # Get companies for the dropdown filter based on user role, ordered by name
+        if current_user.is_global_admin():
+            # GlobalAdmin can see all companies
+            companies = Company.query.order_by(Company.name).all()
+        else:
+            # Get user's companies, ordered by name
+            user_company_ids = [uc.company_id for uc in current_user.companies]
+            companies = Company.query.filter(Company.id.in_(user_company_ids)).order_by(Company.name).all()
+
+        # Get company filter if provided, otherwise use first available company
         company_id = request.args.get('company_id', type=int)
-        
-        # Build base query with date range filter and eagerly load relationships
-        from auth.models import ApiKey, Company
-        
+        if not company_id and companies:
+            company_id = companies[0].id  # Default to first company
+
         # Convert timezone-aware dates to naive for comparison with database timestamps
-        # since the log timestamps are stored as naive datetime objects
         start_date_naive = start_date.replace(tzinfo=None)
         end_date_naive = end_date.replace(tzinfo=None)
         
@@ -90,38 +97,21 @@ def dashboard():
             db.joinedload(Log.company)
         ).filter(Log.timestamp.between(start_date_naive, end_date_naive))
         
-        # Apply company-specific filtering based on user role
+        # Apply company-specific filtering
         if current_user.is_global_admin():
-            # GlobalAdmin should be allowed to see all records, no matter what company/site
+            # GlobalAdmin with specific company selected
             if company_id:
                 query = query.filter(Log.company_id == company_id)
-            # If no company_id specified, show all logs (no additional filtering)
         else:
-            # CompanyAdmin and User should see only company log events and API Keys (sites) 
-            # for companies they are member of
+            # Regular users always need company filtering
             user_company_ids = [uc.company_id for uc in current_user.companies]
-            
-            if not user_company_ids:
-                # If user has no company associations, show no logs
-                query = query.filter(Log.id == -1)  # Impossible condition = no results
+            if company_id and company_id in user_company_ids:
+                query = query.filter(Log.company_id == company_id)
             else:
-                if company_id and company_id in user_company_ids:
-                    # Filter by the specific company if requested and user has access
-                    query = query.filter(Log.company_id == company_id)
-                else:
-                    # Show logs from all companies the user has access to
-                    query = query.filter(Log.company_id.in_(user_company_ids))
+                query = query.filter(Log.company_id.in_(user_company_ids))
         
         # Get the logs ordered by timestamp (newest first)
         logs = query.order_by(Log.timestamp.desc()).all()
-        
-        # Get companies for the dropdown filter based on user role
-        if current_user.is_global_admin():
-            # GlobalAdmin can see all companies
-            companies = Company.query.all()
-        else:
-            # CompanyAdmin and User should see only companies they are member of
-            companies = current_user.get_companies()
 
         return render_template('frontend/dashboard.html', 
                               title='Dashboard', 

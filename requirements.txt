@@ -13,7 +13,8 @@ pillow
 Flask-Migrate
 
 # serving the application
-waitress  # Production WSGI server for Windows (better than Gunicorn for Windows)
+#waitress  # Production WSGI server for Windows (better than Gunicorn for Windows)
+redis
 gunicorn  # Production WSGI server (Linux/Unix only - won't work on Windows)
 #psutil  # System monitoring for health checks
 #click  # CLI tools (for database backups)

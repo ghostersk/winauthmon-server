@@ -181,11 +181,9 @@
                             <input type="text" id="daterange" name="daterange" class="form-control" 
                                    value="{{ start_date.strftime('%Y-%m-%d %H:%M') if start_date else '' }} - {{ end_date.strftime('%Y-%m-%d %H:%M') if end_date else '' }}"/>
                         </div>
-                        {% if companies %}
                         <div class="col-md-3">
                             <label for="company_id" class="form-label">Company:</label>
-                            <select class="form-select" id="company_id" name="company_id">
-                                <option value="">All Companies</option>
+                            <select class="form-select" id="company_id" name="company_id" required>
                                 {% for company in companies %}
                                 <option value="{{ company.id }}" {% if selected_company_id == company.id %}selected{% endif %}>
                                     {{ company.name }}
@@ -193,7 +191,6 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        {% endif %}
                         <div class="col-md-2">
                             <button type="submit" class="btn btn-primary">Apply Filter</button>
                         </div>
@@ -210,9 +207,7 @@
                             <th>Timestamp</th>
                             <th>Event Type</th>
                             <th>User Name</th>
-                            {% if current_user.is_global_admin() and not selected_company_id %}
-                                <th>Company</th>
-                            {% endif %}
+                            <th>Company</th>
                             <th>Site</th>
                             <th>Computer Name</th>
                             <th>Local IP</th>
@@ -227,9 +222,7 @@
                             </td>
                             <td>{{ log.event_type }}</td>
                             <td>{{ log.user_name }}</td>
-                            {% if current_user.is_global_admin() and not selected_company_id %}
-                                <td>{{ log.company.name if log.company else '' }}</td>
-                            {% endif %}
+                            <td>{{ log.company.name if log.company else '' }}</td>
                             <td>{{ log.api_key.description if log.api_key else '' }}</td>
                             <td>{{ log.computer_name }}</td>
                             <td>{{ log.local_ip or '' }}</td>
@@ -317,9 +310,14 @@
                      '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
                 columnDefs: [
                     {
-                        targets: [5, 6, 7], // Computer Name, Local IP, and Public IP columns are now at indices 5, 6, and 7
+                        targets: [5, 6, 7], // Computer Name, Local IP, and Public IP columns
                         visible: false, // Hide by default
                         searchable: true // Still allow searching in these columns
+                    },
+                    {
+                        targets: [3], // Company column
+                        visible: {% if current_user.is_global_admin() %}true{% else %}false{% endif %},
+                        searchable: {% if current_user.is_global_admin() %}true{% else %}false{% endif %}
                     }
                 ],
                 buttons: [
@@ -364,11 +362,7 @@
             });
             
             // Column names for the visibility controls
-            var columnNames = ['Timestamp', 'Event Type', 'User Name'];
-            {% if current_user.is_global_admin() and not selected_company_id %}
-            columnNames.push('Company');
-            {% endif %}
-            columnNames.push('Site', 'Computer Name', 'Local IP', 'Public IP');
+            var columnNames = ['Timestamp', 'Event Type', 'User Name', 'Company', 'Site', 'Computer Name', 'Local IP', 'Public IP'];
             
             // Load saved column visibility from localStorage
             function loadColumnVisibility() {

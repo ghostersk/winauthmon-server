@@ -330,9 +330,8 @@ def init_app():
                 settings.log_level = 'WARNING'
                 db.session.add(settings)
         
-        # Create default admin if not exists
-        admin = User.query.filter_by(email='superadmin@example.com').first()
-        if not admin:
+        # Create default admin only if no users exist in the database
+        if User.query.first() is None:
             hashed_password = bcrypt.generate_password_hash('adminsuper').decode('utf-8')
             admin = User(
                 username='superadmin',
@@ -347,12 +346,11 @@ def init_app():
             # Create initial API key for admin
             api_key = ApiKey(
                 key=ApiKey.generate_key(),
-                description="Initial Admin API Key",
-                user_id=admin.id
+                description="Initial Admin API Key"
             )
             db.session.add(api_key)
-        
-        db.session.commit()
+            db.session.commit()
+            logger.info("Created initial admin account and API key")
 
 # Initialize the application
 init_app()

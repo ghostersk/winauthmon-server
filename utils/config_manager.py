@@ -129,7 +129,7 @@ class ConfigManager:
             
             'logging': {
                 'DB_LOGGING_ENABLED': 'true',
-                'DB_LOGGING_FILTERED_LOGGERS': 'watchfiles.main,watchfiles.watcher,watchdog,uvicorn.access,__mp_main__,__main__,app',
+                'DB_LOGGING_FILTERED_LOGGERS': 'watchfiles.main,watchfiles.watcher,watchdog,uvicorn.access,__mp_main__,__main__,app,werkzeug',
                 'DB_LOGGING_FILTERED_PATTERNS': 'database.db,instance/,file changed,reloading',
                 'FILTER_FILE_WATCHER_LOGS': 'true',
                 'DB_LOGGING_DEDUPE_INTERVAL': '1',
